@@ -11,12 +11,13 @@
  */
 
 #include <linux/init.h>
+#include <linux/oc.h>
 
 #include <mach/emif.h>
 #include "board-tuna.h"
 
 const struct lpddr2_timings lpddr2_samsung_timings_400_mhz = {
-	.max_freq	= 400000000,
+	.max_freq	= 4000000 * GPU_OC_VALUE,
 	.RL		= 6,
 	.tRPab		= 21,
 	.tRCD		= 18,
@@ -39,7 +40,7 @@ const struct lpddr2_timings lpddr2_samsung_timings_400_mhz = {
 };
 
 const struct lpddr2_timings lpddr2_samsung_timings_200_mhz = {
-	.max_freq	= 200000000,
+	.max_freq	= 2000000 * GPU_OC_VALUE,
 	.RL		= 3,
 	.tRPab		= 21,
 	.tRCD		= 18,

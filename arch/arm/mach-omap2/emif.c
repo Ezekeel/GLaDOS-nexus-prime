@@ -20,6 +20,7 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/oc.h>
 
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
@@ -514,9 +515,9 @@ static u32 get_ddr_phy_ctrl_1(u32 freq, u8 RL)
 	mask_n_set(phy, OMAP44XX_REG_READ_LATENCY_SHIFT,
 		   OMAP44XX_REG_READ_LATENCY_MASK, RL + 2);
 
-	if (freq <= 100000000)
+	if (freq <= 1000000 * GPU_OC_VALUE)
 		val = EMIF_DLL_SLAVE_DLY_CTRL_100_MHZ_AND_LESS;
-	else if (freq <= 200000000)
+	else if (freq <= 2000000 * GPU_OC_VALUE)
 		val = EMIF_DLL_SLAVE_DLY_CTRL_200_MHZ;
 	else
 		val = EMIF_DLL_SLAVE_DLY_CTRL_400_MHZ;
