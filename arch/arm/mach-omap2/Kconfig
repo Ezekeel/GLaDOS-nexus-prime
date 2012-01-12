@@ -398,6 +398,14 @@ config OMAP4_PPA_CPU1_ONLINE_BUG
 	  If, on the other hand, you do not understand the change, leave the
 	  default as enabled.
 
+config OMAP_SCREENOFF_MAXFREQ
+	bool "Enable support for limiting the CPU frequency when screen off" 
+	default y
+	help
+	  Enable support for limiting the CPU frequency when screen is off
+	  by adding the entry 'screen_off_max_freq' to the CPUfreq sysfs
+	  interface.
+
 endmenu
 
 endif
