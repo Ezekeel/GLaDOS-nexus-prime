@@ -13,6 +13,8 @@
 #ifndef _EMIF_H
 #define _EMIF_H
 
+#include <linux/oc.h>
+
 #include <mach/emif-44xx.h>
 #include <mach/lpddr2-jedec.h>
 
@@ -21,7 +23,7 @@
 #define EMIF2	1
 
 /* The maximum frequency at which the LPDDR2 interface can operate in Hz*/
-#define MAX_LPDDR2_FREQ	400000000	/* 400 MHz */
+#define MAX_LPDDR2_FREQ	4000000 * GPU_OC_VALUE	/* 400 MHz */
 
 /* 19.2 MHz to be used for finding initialization values */
 #define EMIF_FREQ_19_2_MHZ 19200000	/* 19.2 MHz */
@@ -40,7 +42,7 @@
  * Determines the number of entries in the pointer array for register
  * cache
  */
-#define EMIF_MAX_NUM_FREQUENCIES	6
+#define EMIF_MAX_NUM_FREQUENCIES	12
 /*
  * Indices into the Addressing Table array.
  * One entry each for all the different types of devices with different

@@ -365,12 +365,28 @@ config OMAP_ALLOW_OSWR
 	  Which means the Logic of power domains can be lost now
 	  unlike the CSWR wherein the logic is retained
 
+config OMAP_C4_MPUOSWR
+	bool  "Enable Open Switch Retention in the C4 state for the MPU"
+	depends on OMAP_ALLOW_OSWR
+	default n
+	help
+	  Select this option to enable powering down the MPU logic
+	  in the C4 state reducing the power consumption.
+
 config OMAP_FIQ_DEBUGGER
 	bool "Enable the serial FIQ debugger on OMAP"
 	default y
 	select FIQ_DEBUGGER
 	help
 	  Enables the serial FIQ debugger on OMAP"
+
+config OMAP_SCREENOFF_MAXFREQ
+	bool "Enable support for limiting the CPU frequency when screen off" 
+	default y
+	help
+	  Enable support for limiting the CPU frequency when screen is off
+	  by adding the entry 'screen_off_max_freq' to the CPUfreq sysfs
+	  interface.
 
 endmenu
 
