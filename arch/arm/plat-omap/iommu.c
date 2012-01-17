@@ -862,7 +862,11 @@ struct iommu *iommu_get(const char *name)
 
 	if (obj->refcount++ == 0) {
 		dev_info(obj->dev, "%s: %s qos_request\n", __func__, obj->name);
+#ifdef CONFIG_OMAP_IPU_DEEPIDLE
+		pm_qos_update_request(obj->qos_request, 1500);
+#else
 		pm_qos_update_request(obj->qos_request, 10);
+#endif
 		err = iommu_enable(obj);
 		if (err) {
 			pm_qos_update_request(obj->qos_request, -1);
