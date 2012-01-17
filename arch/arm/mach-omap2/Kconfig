@@ -394,6 +394,13 @@ config OMAP_IPU_DEEPIDLE
 	help
 	  Enable C-states > C1 during hardware-accelerated video playback.
 
+config OMAP_SCALING_FREQS
+	bool "Enable support for showing the available CPU frequencies"
+	default y
+	help
+	  Enable support for showing the available CPU frequencies by adding 
+	  the entry 'scaling_available_frequencies' to the sysfs interface.
+
 endmenu
 
 endif
