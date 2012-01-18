@@ -32,6 +32,8 @@ static struct mutex * frequency_mutex = NULL;
 
 static struct cpufreq_policy * freq_policy = NULL;
 
+unsigned int * maximum_thermal = NULL;
+
 struct opp {
     struct list_head node;
 
@@ -51,6 +53,14 @@ struct device_opp {
 
 extern struct device_opp * find_device_opp(struct device * dev);
 extern void cpufreq_stats_reset(void);
+
+void register_maxthermal(unsigned int * max_thermal)
+{
+    maximum_thermal = max_thermal;
+
+    return;
+}
+EXPORT_SYMBOL(register_maxthermal);
 
 void register_freqpolicy(struct cpufreq_policy * policy)
 {
@@ -117,7 +127,7 @@ static void mpu_update(void)
 
     struct opp * temp_opp;
 
-    int i, index_min, index_max;
+    int i, index_min, index_max, index_maxthermal;
 
     mutex_lock(frequency_mutex);
 
@@ -133,6 +143,9 @@ static void mpu_update(void)
 	    if (frequency_table[i].frequency == freq_policy->user_policy.max)
 		index_max = i;
 
+	    if (frequency_table[i].frequency == *(maximum_thermal))
+		index_maxthermal = i;
+
 	    if (i != 0)
 		{
 		    temp_opp->rate = (original_mpu_freqs[i] / 100) * mpu_ocvalue;
@@ -147,6 +160,8 @@ static void mpu_update(void)
 
     freq_policy->user_policy.min = frequency_table[index_min].frequency;
     freq_policy->user_policy.max = frequency_table[index_max].frequency;
+
+    *(maximum_thermal) = frequency_table[index_maxthermal].frequency;
 
     mutex_unlock(frequency_mutex);
 
