@@ -150,7 +150,9 @@ static void mpu_update(void)
 
     mutex_unlock(frequency_mutex);
 
+#ifdef CONFIG_CPU_FREQ_STAT
     cpufreq_stats_reset();
+#endif
 
     return;
 }
