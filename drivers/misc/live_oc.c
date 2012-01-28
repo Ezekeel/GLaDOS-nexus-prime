@@ -14,6 +14,9 @@
 #include <linux/cpufreq.h>
 #include <linux/opp.h>
 
+#include "../../arch/arm/mach-omap2/voltage.h"
+#include "../../arch/arm/mach-omap2/smartreflex.h"
+
 #define LIVEOC_VERSION 1
 
 #define MAX_MPU_OCVALUE 150
@@ -31,6 +34,8 @@ static struct cpufreq_frequency_table * frequency_table = NULL;
 static struct mutex * frequency_mutex = NULL;
 
 static struct cpufreq_policy * freq_policy = NULL;
+
+static struct voltagedomain * mpu_voltdm = NULL;
 
 unsigned int * maximum_thermal = NULL;
 
@@ -106,6 +111,8 @@ void liveoc_init(void)
 
     int i;
 
+    mpu_voltdm = voltdm_lookup("mpu");
+
     dev_opp = find_device_opp(mpu_device);
 
     i = 0;
@@ -162,6 +169,10 @@ static void liveoc_mpu_update(void)
     freq_policy->user_policy.max = frequency_table[index_max].frequency;
 
     *(maximum_thermal) = frequency_table[index_maxthermal].frequency;
+
+    omap_sr_disable_reset_volt(mpu_voltdm);
+    omap_voltage_calib_reset(mpu_voltdm);
+    omap_sr_enable(mpu_voltdm, omap_voltage_get_curr_vdata(mpu_voltdm));
 
     mutex_unlock(frequency_mutex);
 
