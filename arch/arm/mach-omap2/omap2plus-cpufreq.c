@@ -68,10 +68,10 @@ static bool omap_cpufreq_ready;
 static bool omap_cpufreq_suspended;
 
 #ifdef CONFIG_LIVE_OC
-extern void register_freqtable(struct cpufreq_frequency_table * freq_table);
-extern void register_freqmutex(struct mutex * freq_mutex);
-extern void register_freqpolicy(struct cpufreq_policy * policy);
-extern void register_maxthermal(unsigned int * max_thermal);
+extern void liveoc_register_freqtable(struct cpufreq_frequency_table * freq_table);
+extern void liveoc_register_freqmutex(struct mutex * freq_mutex);
+extern void liveoc_register_freqpolicy(struct cpufreq_policy * policy);
+extern void liveoc_register_maxthermal(unsigned int * max_thermal);
 #endif
 
 static unsigned int omap_getspeed(unsigned int cpu)
@@ -376,10 +376,10 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
 	policy->cpuinfo.transition_latency = 300 * 1000;
 
 #ifdef CONFIG_LIVE_OC
-	register_maxthermal(&max_thermal);
-	register_freqpolicy(policy);
-	register_freqtable(freq_table);
-	register_freqmutex(&omap_cpufreq_lock);
+	liveoc_register_maxthermal(&max_thermal);
+	liveoc_register_freqpolicy(policy);
+	liveoc_register_freqtable(freq_table);
+	liveoc_register_freqmutex(&omap_cpufreq_lock);
 #endif
 
 	return 0;

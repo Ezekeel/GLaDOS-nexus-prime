@@ -54,39 +54,39 @@ struct device_opp {
 extern struct device_opp * find_device_opp(struct device * dev);
 extern void cpufreq_stats_reset(void);
 
-void register_maxthermal(unsigned int * max_thermal)
+void liveoc_register_maxthermal(unsigned int * max_thermal)
 {
     maximum_thermal = max_thermal;
 
     return;
 }
-EXPORT_SYMBOL(register_maxthermal);
+EXPORT_SYMBOL(liveoc_register_maxthermal);
 
-void register_freqpolicy(struct cpufreq_policy * policy)
+void liveoc_register_freqpolicy(struct cpufreq_policy * policy)
 {
     freq_policy = policy;
 
     return;
 }
-EXPORT_SYMBOL(register_freqpolicy);
+EXPORT_SYMBOL(liveoc_register_freqpolicy);
 
-void register_freqtable(struct cpufreq_frequency_table * freq_table)
+void liveoc_register_freqtable(struct cpufreq_frequency_table * freq_table)
 {
     frequency_table = freq_table;
 
     return;
 }
-EXPORT_SYMBOL(register_freqtable);
+EXPORT_SYMBOL(liveoc_register_freqtable);
 
-void register_freqmutex(struct mutex * freq_mutex)
+void liveoc_register_freqmutex(struct mutex * freq_mutex)
 {
     frequency_mutex = freq_mutex;
 
     return;
 }
-EXPORT_SYMBOL(register_freqmutex);
+EXPORT_SYMBOL(liveoc_register_freqmutex);
 
-void register_oppdevice(struct device * dev, char * dev_name)
+void liveoc_register_oppdevice(struct device * dev, char * dev_name)
 {
     if (!strcmp(dev_name, "mpu"))
 	{
@@ -96,7 +96,7 @@ void register_oppdevice(struct device * dev, char * dev_name)
 
     return;
 }
-EXPORT_SYMBOL(register_oppdevice);
+EXPORT_SYMBOL(liveoc_register_oppdevice);
 
 void liveoc_init(void)
 {
@@ -121,7 +121,7 @@ void liveoc_init(void)
 }
 EXPORT_SYMBOL(liveoc_init);
 
-static void mpu_update(void)
+static void liveoc_mpu_update(void)
 {
     struct device_opp * dev_opp;
 
@@ -189,7 +189,7 @@ static ssize_t mpu_ocvalue_write(struct device * dev, struct device_attribute * 
 			{
 			    mpu_ocvalue = data;
 		    
-			    mpu_update();
+			    liveoc_mpu_update();
 			}
 
 		    pr_info("LIVEOC MPU oc-value set to %u\n", mpu_ocvalue);
