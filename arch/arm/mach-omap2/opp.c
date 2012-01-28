@@ -31,6 +31,10 @@ extern void liveoc_register_oppdevice(struct device * dev, char * dev_name);
 extern void liveoc_init(void);
 #endif
 
+#ifdef CONFIG_CUSTOM_VOLTAGE
+extern void customvoltage_register_oppdevice(struct device * dev, char * dev_name);
+#endif
+
 /* Temp variable to allow multiple calls */
 static u8 __initdata omap_table_init;
 
@@ -118,6 +122,10 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
 					__func__, opp_def->hwmod_name, r, i);
 #ifdef CONFIG_LIVE_OC
 			liveoc_register_oppdevice(dev, opp_def->hwmod_name);
+#endif
+
+#ifdef CONFIG_CUSTOM_VOLTAGE
+			customvoltage_register_oppdevice(dev, opp_def->hwmod_name);
 #endif
 		}
 next:

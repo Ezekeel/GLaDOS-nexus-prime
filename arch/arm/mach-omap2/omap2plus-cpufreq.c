@@ -76,6 +76,12 @@ extern void liveoc_register_freqpolicy(struct cpufreq_policy * policy);
 extern void liveoc_register_maxthermal(unsigned int * max_thermal);
 #endif
 
+#ifdef CONFIG_CUSTOM_VOLTAGE
+extern void customvoltage_register_freqtable(struct cpufreq_frequency_table * freq_table);
+extern void customvoltage_register_freqmutex(struct mutex * freq_mutex);
+extern void customvoltage_init(void);
+#endif
+
 static unsigned int omap_getspeed(unsigned int cpu)
 {
 	unsigned long rate;
@@ -385,6 +391,12 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
 	liveoc_register_freqmutex(&omap_cpufreq_lock);
 #endif
 
+#ifdef CONFIG_CUSTOM_VOLTAGE
+	customvoltage_register_freqtable(freq_table);
+	customvoltage_register_freqmutex(&omap_cpufreq_lock);
+	customvoltage_init();
+#endif
+
 	return 0;
 
 fail_table:
@@ -446,13 +458,39 @@ struct freq_attr omap_cpufreq_attr_screen_off_freq = {
 };
 #endif
 
-#if defined(CONFIG_OMAP_SCALING_FREQS) || defined(CONFIG_OMAP_SCREENOFF_MAXFREQ)
+#ifdef CONFIG_CUSTOM_VOLTAGE
+extern ssize_t customvoltage_voltages_read(struct device * dev, struct device_attribute * attr, char * buf);
+extern ssize_t customvoltage_voltages_write(struct device * dev, struct device_attribute * attr, const char * buf, size_t size);
+
+static ssize_t show_UV_mV_table(struct cpufreq_policy * policy, char * buf)
+{
+    return customvoltage_voltages_read(NULL, NULL, buf);
+}
+
+static ssize_t store_UV_mV_table(struct cpufreq_policy * policy, const char * buf, size_t count)
+{
+    return customvoltage_voltages_write(NULL, NULL, buf, count);
+}
+
+static struct freq_attr omap_UV_mV_table = {
+    .attr = {.name = "UV_mV_table",
+	     .mode=0644,
+    },
+    .show = show_UV_mV_table,
+    .store = store_UV_mV_table,
+};
+#endif
+
+#if defined(CONFIG_OMAP_SCALING_FREQS) || defined(CONFIG_OMAP_SCREENOFF_MAXFREQ) || defined(CONFIG_CUSTOM_VOLTAGE)
 static struct freq_attr *omap_cpufreq_attr[] = {
 #ifdef CONFIG_OMAP_SCALING_FREQS
 	&cpufreq_freq_attr_scaling_available_freqs,
 #endif
 #ifdef CONFIG_OMAP_SCREENOFF_MAXFREQ
 	&omap_cpufreq_attr_screen_off_freq,
+#endif
+#ifdef CONFIG_CUSTOM_VOLTAGE
+	&omap_UV_mV_table,
 #endif
 	NULL,
 };
@@ -466,7 +504,7 @@ static struct cpufreq_driver omap_driver = {
 	.init		= omap_cpu_init,
 	.exit		= omap_cpu_exit,
 	.name		= "omap2plus",
-#if defined(CONFIG_OMAP_SCALING_FREQS) || defined(CONFIG_OMAP_SCREENOFF_MAXFREQ)
+#if defined(CONFIG_OMAP_SCALING_FREQS) || defined(CONFIG_OMAP_SCREENOFF_MAXFREQ) || defined(CONFIG_CUSTOM_VOLTAGE)
 	.attr		= omap_cpufreq_attr,
 #endif
 };

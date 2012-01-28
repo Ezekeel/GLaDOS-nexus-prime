@@ -62,3 +62,4 @@ obj-$(CONFIG_TOUCH_WAKE)	+= touch_wake.o
 obj-$(CONFIG_LIVE_OC)		+= live_oc.o
 obj-$(CONFIG_BLX)		+= blx.o
 obj-$(CONFIG_COLOR_CONTROL)	+= color_control.o
+obj-$(CONFIG_CUSTOM_VOLTAGE)	+= custom_voltage.o
