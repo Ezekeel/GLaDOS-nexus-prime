@@ -27,7 +27,7 @@
 #include "dvfs.h"
 
 #ifdef CONFIG_LIVE_OC
-extern void register_oppdevice(struct device * dev, char * dev_name);
+extern void liveoc_register_oppdevice(struct device * dev, char * dev_name);
 extern void liveoc_init(void);
 #endif
 
@@ -117,7 +117,7 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
 				dev_err(dev, "%s:%s:err dvfs register %d %d\n",
 					__func__, opp_def->hwmod_name, r, i);
 #ifdef CONFIG_LIVE_OC
-			register_oppdevice(dev, opp_def->hwmod_name);
+			liveoc_register_oppdevice(dev, opp_def->hwmod_name);
 #endif
 		}
 next:
