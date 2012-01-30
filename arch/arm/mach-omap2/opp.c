@@ -28,7 +28,6 @@
 
 #ifdef CONFIG_LIVE_OC
 extern void liveoc_register_oppdevice(struct device * dev, char * dev_name);
-extern void liveoc_init(void);
 #endif
 
 /* Temp variable to allow multiple calls */
@@ -123,10 +122,6 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
 next:
 		opp_def++;
 	}
-
-#ifdef CONFIG_LIVE_OC
-	liveoc_init();
-#endif
 
 	return 0;
 }

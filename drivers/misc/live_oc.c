@@ -11,8 +11,12 @@
 #include <linux/device.h>
 #include <linux/miscdevice.h>
 #include <linux/list.h>
+#include <linux/clk.h>
 #include <linux/cpufreq.h>
 #include <linux/opp.h>
+#include <linux/slab.h>
+
+#include <plat/clock.h>
 
 #include "../../arch/arm/mach-omap2/voltage.h"
 #include "../../arch/arm/mach-omap2/smartreflex.h"
@@ -21,11 +25,11 @@
 
 #define MAX_MPU_OCVALUE 150
 
-#define NUM_MPU_FREQS	5
+#define FREQ_INCREASE_STEP 100000
 
 static int mpu_ocvalue = 100;
 
-static unsigned long original_mpu_freqs[NUM_MPU_FREQS];
+static unsigned long * original_mpu_freqs;
 
 static struct device * mpu_device = NULL;
 
@@ -36,6 +40,8 @@ static struct mutex * frequency_mutex = NULL;
 static struct cpufreq_policy * freq_policy = NULL;
 
 static struct voltagedomain * mpu_voltdm = NULL;
+
+static struct clk * dpll_mpu_clock = NULL;
 
 unsigned int * maximum_thermal = NULL;
 
@@ -113,15 +119,30 @@ void liveoc_init(void)
 
     mpu_voltdm = voltdm_lookup("mpu");
 
+    dpll_mpu_clock = clk_get(NULL, "dpll_mpu_ck");
+
     dev_opp = find_device_opp(mpu_device);
 
     i = 0;
 
     list_for_each_entry(temp_opp, &dev_opp->opp_list, node)
 	{
-	    original_mpu_freqs[i] = temp_opp->rate;
+	    if (temp_opp->available)
+		i++;
+	}
 
-	    i++;
+    original_mpu_freqs = kzalloc(i * sizeof(unsigned long), GFP_KERNEL);
+
+    i = 0;
+
+    list_for_each_entry(temp_opp, &dev_opp->opp_list, node)
+	{
+	    if (temp_opp->available)
+		{
+		    original_mpu_freqs[i] = temp_opp->rate;
+
+		    i++;
+		}
 	}
  
     return;
@@ -134,9 +155,16 @@ static void liveoc_mpu_update(void)
 
     struct opp * temp_opp;
 
-    int i, index_min, index_max, index_maxthermal;
+    int i, index_min = 0, index_max = 0, index_maxthermal = 0;
+
+    unsigned long new_freq;
+
+    long rounded_freq;
 
     mutex_lock(frequency_mutex);
+
+    omap_sr_disable_reset_volt(mpu_voltdm);
+    omap_voltage_calib_reset(mpu_voltdm);
 
     dev_opp = find_device_opp(mpu_device);
 
@@ -144,23 +172,33 @@ static void liveoc_mpu_update(void)
 
     list_for_each_entry(temp_opp, &dev_opp->opp_list, node)
 	{
-	    if (frequency_table[i].frequency == freq_policy->user_policy.min)
-		index_min = i;
-
-	    if (frequency_table[i].frequency == freq_policy->user_policy.max)
-		index_max = i;
-
-	    if (frequency_table[i].frequency == *(maximum_thermal))
-		index_maxthermal = i;
-
-	    if (i != 0)
+	    if (temp_opp->available)
 		{
-		    temp_opp->rate = (original_mpu_freqs[i] / 100) * mpu_ocvalue;
-		    if (temp_opp->available)
-			frequency_table[i].frequency = temp_opp->rate / 1000;
-		}
+		    if (frequency_table[i].frequency == freq_policy->user_policy.min)
+			index_min = i;
 
-	    i++;
+		    if (frequency_table[i].frequency == freq_policy->user_policy.max)
+			index_max = i;
+
+		    if (frequency_table[i].frequency == *(maximum_thermal))
+			index_maxthermal = i;
+
+		    new_freq = (original_mpu_freqs[i] / 100) * mpu_ocvalue;
+
+		    rounded_freq = dpll_mpu_clock->round_rate(dpll_mpu_clock, new_freq);
+
+		    while (rounded_freq <= 0)
+			{
+			    new_freq += FREQ_INCREASE_STEP;
+			    rounded_freq = dpll_mpu_clock->round_rate(dpll_mpu_clock, new_freq);
+			}
+
+		    temp_opp->rate = new_freq;
+
+		    frequency_table[i].frequency = temp_opp->rate / 1000;
+
+		    i++;
+		}
 	}
 
     cpufreq_frequency_table_cpuinfo(freq_policy, frequency_table);
@@ -170,8 +208,6 @@ static void liveoc_mpu_update(void)
 
     *(maximum_thermal) = frequency_table[index_maxthermal].frequency;
 
-    omap_sr_disable_reset_volt(mpu_voltdm);
-    omap_voltage_calib_reset(mpu_voltdm);
     omap_sr_enable(mpu_voltdm, omap_voltage_get_curr_vdata(mpu_voltdm));
 
     mutex_unlock(frequency_mutex);
