@@ -3667,10 +3667,17 @@ int __init omap4xxx_clk_init(void)
 	clk_enable_init_clocks();
 
 	new_rate = (dpll_core_ck.rate / 100) * GPU_OC_VALUE;
-
 	dpll_core_ck.round_rate(&dpll_core_ck, new_rate);
 	dpll_core_ck.set_rate(&dpll_core_ck, new_rate);
 	dpll_core_x2_ck.rate = 2 * dpll_core_ck.rate;
 	
+	new_rate = (dpll_per_ck.rate / 100) * GPU_OC_VALUE;
+	dpll_per_ck.round_rate(&dpll_per_ck, new_rate);
+	dpll_per_ck.set_rate(&dpll_per_ck, new_rate);
+
+	new_rate = (dpll_iva_ck.rate / 100) * IVA_OC_VALUE;
+	dpll_iva_ck.round_rate(&dpll_iva_ck, new_rate);
+	dpll_iva_ck.set_rate(&dpll_iva_ck, new_rate);
+
 	return 0;
 }
