@@ -27,9 +27,11 @@
 
 #define FREQ_INCREASE_STEP 100000
 
-static int mpu_ocvalue = 100;
+static int mpu_ocvalue = 100, num_mpufreqs;
 
 static unsigned long * original_mpu_freqs;
+
+static unsigned long ** mpu_freqs;
 
 static struct device * mpu_device = NULL;
 
@@ -123,15 +125,16 @@ void liveoc_init(void)
 
     dev_opp = find_device_opp(mpu_device);
 
-    i = 0;
+    num_mpufreqs = 0;
 
     list_for_each_entry(temp_opp, &dev_opp->opp_list, node)
 	{
 	    if (temp_opp->available)
-		i++;
+		num_mpufreqs++;
 	}
 
-    original_mpu_freqs = kzalloc(i * sizeof(unsigned long), GFP_KERNEL);
+    original_mpu_freqs = kzalloc(num_mpufreqs * sizeof(unsigned long), GFP_KERNEL);
+    mpu_freqs = kzalloc(num_mpufreqs * sizeof(unsigned long *), GFP_KERNEL);
 
     i = 0;
 
@@ -140,6 +143,7 @@ void liveoc_init(void)
 	    if (temp_opp->available)
 		{
 		    original_mpu_freqs[i] = temp_opp->rate;
+		    mpu_freqs[i] = &(temp_opp->rate);
 
 		    i++;
 		}
@@ -151,10 +155,6 @@ EXPORT_SYMBOL(liveoc_init);
 
 static void liveoc_mpu_update(void)
 {
-    struct device_opp * dev_opp;
-
-    struct opp * temp_opp;
-
     int i, index_min = 0, index_max = 0, index_maxthermal = 0;
 
     unsigned long new_freq;
@@ -166,39 +166,30 @@ static void liveoc_mpu_update(void)
     omap_sr_disable_reset_volt(mpu_voltdm);
     omap_voltage_calib_reset(mpu_voltdm);
 
-    dev_opp = find_device_opp(mpu_device);
-
-    i = 0;
-
-    list_for_each_entry(temp_opp, &dev_opp->opp_list, node)
+    for (i = 0; i < num_mpufreqs; i++)
 	{
-	    if (temp_opp->available)
+	    if (frequency_table[i].frequency == freq_policy->user_policy.min)
+		index_min = i;
+
+	    if (frequency_table[i].frequency == freq_policy->user_policy.max)
+		index_max = i;
+
+	    if (frequency_table[i].frequency == *(maximum_thermal))
+		index_maxthermal = i;
+
+	    new_freq = (original_mpu_freqs[i] / 100) * mpu_ocvalue;
+
+	    rounded_freq = dpll_mpu_clock->round_rate(dpll_mpu_clock, new_freq);
+
+	    while (rounded_freq <= 0)
 		{
-		    if (frequency_table[i].frequency == freq_policy->user_policy.min)
-			index_min = i;
-
-		    if (frequency_table[i].frequency == freq_policy->user_policy.max)
-			index_max = i;
-
-		    if (frequency_table[i].frequency == *(maximum_thermal))
-			index_maxthermal = i;
-
-		    new_freq = (original_mpu_freqs[i] / 100) * mpu_ocvalue;
-
+		    new_freq += FREQ_INCREASE_STEP;
 		    rounded_freq = dpll_mpu_clock->round_rate(dpll_mpu_clock, new_freq);
-
-		    while (rounded_freq <= 0)
-			{
-			    new_freq += FREQ_INCREASE_STEP;
-			    rounded_freq = dpll_mpu_clock->round_rate(dpll_mpu_clock, new_freq);
-			}
-
-		    temp_opp->rate = new_freq;
-
-		    frequency_table[i].frequency = temp_opp->rate / 1000;
-
-		    i++;
 		}
+
+	    *mpu_freqs[i] = new_freq;
+
+	    frequency_table[i].frequency = *mpu_freqs[i] / 1000;
 	}
 
     cpufreq_frequency_table_cpuinfo(freq_policy, frequency_table);

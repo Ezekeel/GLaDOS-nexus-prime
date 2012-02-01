@@ -42,6 +42,10 @@
 
 #include "dvfs.h"
 
+#ifdef CONFIG_LIVE_OC
+#include <linux/live_oc.h>
+#endif
+
 #ifdef CONFIG_SMP
 struct lpj_info {
 	unsigned long	ref;
@@ -66,13 +70,6 @@ static unsigned int current_target_freq;
 static unsigned int screen_off_max_freq;
 static bool omap_cpufreq_ready;
 static bool omap_cpufreq_suspended;
-
-#ifdef CONFIG_LIVE_OC
-extern void liveoc_register_freqtable(struct cpufreq_frequency_table * freq_table);
-extern void liveoc_register_freqmutex(struct mutex * freq_mutex);
-extern void liveoc_register_freqpolicy(struct cpufreq_policy * policy);
-extern void liveoc_register_maxthermal(unsigned int * max_thermal);
-#endif
 
 static unsigned int omap_getspeed(unsigned int cpu)
 {

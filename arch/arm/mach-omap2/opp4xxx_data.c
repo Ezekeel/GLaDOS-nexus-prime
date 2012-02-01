@@ -29,7 +29,7 @@
 #include "pm.h"
 
 #ifdef CONFIG_LIVE_OC
-extern void liveoc_init(void);
+#include <linux/live_oc.h>
 #endif
 
 /*
