@@ -38,6 +38,10 @@
 #include "control.h"
 #include "scrm44xx.h"
 
+#ifdef CONFIG_LIVE_OC
+#include <linux/live_oc.h>
+#endif
+
 /* OMAP4 modulemode control */
 #define OMAP4430_MODULEMODE_HWCTRL			0
 #define OMAP4430_MODULEMODE_SWCTRL			1
@@ -451,6 +455,10 @@ static struct clk dpll_core_ck = {
 	.init		= &omap2_init_dpll_parent,
 	.ops		= &clkops_omap3_core_dpll_ops,
 	.recalc		= &omap3_dpll_recalc,
+#ifdef CONFIG_LIVE_OC
+	.round_rate     = &omap2_dpll_round_rate,
+	.set_rate       = &omap3_noncore_dpll_set_rate,
+#endif
 };
 
 static struct clk dpll_core_x2_ck = {
@@ -3606,18 +3614,30 @@ static int omap4_virt_l3_set_rate(struct clk *clk, unsigned long rate)
 {
 	struct virt_l3_ck_deps *l3_deps;
 
+#ifdef CONFIG_LIVE_OC
+	if (rate <= (L3_OPP50_RATE / 100) * liveoc_core_ocvalue())
+#else
 	if (rate <= L3_OPP50_RATE)
+#endif
 		l3_deps = &omap4_virt_l3_clk_deps[L3_OPP_50_INDEX];
 	else
 		l3_deps = &omap4_virt_l3_clk_deps[L3_OPP_100_INDEX];
 
+#ifdef CONFIG_LIVE_OC
+	omap4_clksel_set_rate(&dpll_core_m3x2_ck, (l3_deps->core_m3_rate / 100) * liveoc_core_ocvalue());
+	omap4_clksel_set_rate(&dpll_core_m6x2_ck, (l3_deps->core_m6_rate / 100) * liveoc_core_ocvalue());
+	omap4_clksel_set_rate(&dpll_core_m7x2_ck, (l3_deps->core_m7_rate / 100) * liveoc_core_ocvalue());
+	omap4_clksel_set_rate(&dpll_core_m5x2_ck, rate * 2);
+	omap4_clksel_set_rate(&dpll_core_m2_ck, (l3_deps->core_m2_rate / 100) * liveoc_core_ocvalue());
+#else
 	omap4_clksel_set_rate(&dpll_core_m3x2_ck, l3_deps->core_m3_rate);
 	omap4_clksel_set_rate(&dpll_core_m6x2_ck, l3_deps->core_m6_rate);
 	omap4_clksel_set_rate(&dpll_core_m7x2_ck, l3_deps->core_m7_rate);
-	omap4_clksel_set_rate(&dpll_per_m3x2_ck, l3_deps->per_m3_rate);
-	omap4_clksel_set_rate(&dpll_per_m6x2_ck, l3_deps->per_m6_rate);
 	omap4_clksel_set_rate(&dpll_core_m5x2_ck, rate * 2);
 	omap4_clksel_set_rate(&dpll_core_m2_ck, l3_deps->core_m2_rate);
+#endif
+	omap4_clksel_set_rate(&dpll_per_m3x2_ck, l3_deps->per_m3_rate);
+	omap4_clksel_set_rate(&dpll_per_m6x2_ck, l3_deps->per_m6_rate);
 
 	clk->rate = rate;
 	return 0;
