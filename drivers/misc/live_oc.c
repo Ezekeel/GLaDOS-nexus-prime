@@ -15,23 +15,27 @@
 #include <linux/cpufreq.h>
 #include <linux/opp.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
+#include <linux/earlysuspend.h>
 
 #include <plat/clock.h>
 
 #include "../../arch/arm/mach-omap2/voltage.h"
 #include "../../arch/arm/mach-omap2/smartreflex.h"
 
-#define LIVEOC_VERSION 1
+#define LIVEOC_VERSION 2
 
 #define MAX_MPU_OCVALUE 150
+#define MAX_CORE_OCVALUE 150
 
 #define FREQ_INCREASE_STEP 100000
 
-static int mpu_ocvalue = 100;
+#define MAX_GPU_PERFORMANCE 2
 
-static unsigned long * original_mpu_freqs;
+static const long unsigned gpu_freqs[] = {307200000, 384000000, 512000000};
 
-static struct device * mpu_device = NULL;
+static unsigned int mpu_ocvalue = 100, core_ocvalue = 100, gpu_performance = 0,
+    num_mpufreqs, num_l3freqs;
 
 static struct cpufreq_frequency_table * frequency_table = NULL;
 
@@ -39,11 +43,35 @@ static struct mutex * frequency_mutex = NULL;
 
 static struct cpufreq_policy * freq_policy = NULL;
 
+static unsigned long * original_mpu_freqs;
+
+static unsigned long ** mpu_freqs;
+
+static struct device * mpu_device = NULL;
+
 static struct voltagedomain * mpu_voltdm = NULL;
 
 static struct clk * dpll_mpu_clock = NULL;
 
-unsigned int * maximum_thermal = NULL;
+static unsigned long * original_l3_freqs;
+
+static unsigned long ** l3_freqs;
+
+static struct device * l3_device = NULL;
+
+static struct voltagedomain * core_voltdm = NULL;
+
+static struct clk * l3_clock = NULL;
+static struct clk * dpll_core_clock = NULL;
+static struct clk * dpll_corex2_clock = NULL;
+
+static unsigned long original_core_freq;
+
+static struct device * gpu_device = NULL;
+
+static unsigned long * gpu_freq;
+
+static unsigned int * maximum_thermal = NULL;
 
 struct opp {
     struct list_head node;
@@ -64,6 +92,8 @@ struct device_opp {
 
 extern struct device_opp * find_device_opp(struct device * dev);
 extern void cpufreq_stats_reset(void);
+extern void dsscomp_early_suspend(struct early_suspend *h);
+extern void dsscomp_late_resume(struct early_suspend *h);
 
 void liveoc_register_maxthermal(unsigned int * max_thermal)
 {
@@ -104,6 +134,16 @@ void liveoc_register_oppdevice(struct device * dev, char * dev_name)
 	    if (!mpu_device)
 		mpu_device = dev;
 	}
+    else if (!strcmp(dev_name, "l3_main_1"))
+	{
+	    if (!l3_device)
+		l3_device = dev;
+	}
+    else if (!strcmp(dev_name, "gpu"))
+	{
+	    if (!gpu_device)
+		gpu_device = dev;
+	}
 
     return;
 }
@@ -123,15 +163,16 @@ void liveoc_init(void)
 
     dev_opp = find_device_opp(mpu_device);
 
-    i = 0;
+    num_mpufreqs = 0;
 
     list_for_each_entry(temp_opp, &dev_opp->opp_list, node)
 	{
 	    if (temp_opp->available)
-		i++;
+		num_mpufreqs++;
 	}
 
-    original_mpu_freqs = kzalloc(i * sizeof(unsigned long), GFP_KERNEL);
+    original_mpu_freqs = kzalloc(num_mpufreqs * sizeof(unsigned long), GFP_KERNEL);
+    mpu_freqs = kzalloc(num_mpufreqs * sizeof(unsigned long *), GFP_KERNEL);
 
     i = 0;
 
@@ -140,21 +181,69 @@ void liveoc_init(void)
 	    if (temp_opp->available)
 		{
 		    original_mpu_freqs[i] = temp_opp->rate;
+		    mpu_freqs[i] = &(temp_opp->rate);
 
 		    i++;
 		}
 	}
  
+
+    core_voltdm = voltdm_lookup("core");
+
+    l3_clock = clk_get(NULL, "virt_l3_ck");
+    dpll_core_clock = clk_get(NULL, "dpll_core_ck");
+    dpll_corex2_clock = clk_get(NULL, "dpll_core_x2_ck");
+
+    original_core_freq = dpll_core_clock->rate;
+
+    dev_opp = find_device_opp(l3_device);
+
+    num_l3freqs = 0;
+
+    list_for_each_entry(temp_opp, &dev_opp->opp_list, node)
+	{
+	    if (temp_opp->available)
+		num_l3freqs++;
+	}
+
+    original_l3_freqs = kzalloc(num_l3freqs * sizeof(unsigned long), GFP_KERNEL);
+    l3_freqs = kzalloc(num_l3freqs * sizeof(unsigned long *), GFP_KERNEL);
+
+    i = 0;
+
+    list_for_each_entry(temp_opp, &dev_opp->opp_list, node)
+	{
+	    if (temp_opp->available)
+		{
+		    original_l3_freqs[i] = temp_opp->rate;
+		    l3_freqs[i] = &(temp_opp->rate);
+
+		    i++;
+		}
+	}
+
+    temp_opp = opp_find_freq_exact(gpu_device, gpu_freqs[0], true);
+
+    gpu_freq = &(temp_opp->rate);
+
     return;
 }
 EXPORT_SYMBOL(liveoc_init);
 
+int liveoc_core_ocvalue(void)
+{
+    return core_ocvalue;
+}
+EXPORT_SYMBOL(liveoc_core_ocvalue);
+
+unsigned long liveoc_gpu_freq(void)
+{
+    return gpu_freqs[gpu_performance];
+}
+EXPORT_SYMBOL(liveoc_gpu_freq);
+
 static void liveoc_mpu_update(void)
 {
-    struct device_opp * dev_opp;
-
-    struct opp * temp_opp;
-
     int i, index_min = 0, index_max = 0, index_maxthermal = 0;
 
     unsigned long new_freq;
@@ -166,39 +255,30 @@ static void liveoc_mpu_update(void)
     omap_sr_disable_reset_volt(mpu_voltdm);
     omap_voltage_calib_reset(mpu_voltdm);
 
-    dev_opp = find_device_opp(mpu_device);
-
-    i = 0;
-
-    list_for_each_entry(temp_opp, &dev_opp->opp_list, node)
+    for (i = 0; i < num_mpufreqs; i++)
 	{
-	    if (temp_opp->available)
+	    if (frequency_table[i].frequency == freq_policy->user_policy.min)
+		index_min = i;
+
+	    if (frequency_table[i].frequency == freq_policy->user_policy.max)
+		index_max = i;
+
+	    if (frequency_table[i].frequency == *(maximum_thermal))
+		index_maxthermal = i;
+
+	    new_freq = (original_mpu_freqs[i] / 100) * mpu_ocvalue;
+
+	    rounded_freq = dpll_mpu_clock->round_rate(dpll_mpu_clock, new_freq);
+
+	    while (rounded_freq <= 0)
 		{
-		    if (frequency_table[i].frequency == freq_policy->user_policy.min)
-			index_min = i;
-
-		    if (frequency_table[i].frequency == freq_policy->user_policy.max)
-			index_max = i;
-
-		    if (frequency_table[i].frequency == *(maximum_thermal))
-			index_maxthermal = i;
-
-		    new_freq = (original_mpu_freqs[i] / 100) * mpu_ocvalue;
-
+		    new_freq += FREQ_INCREASE_STEP;
 		    rounded_freq = dpll_mpu_clock->round_rate(dpll_mpu_clock, new_freq);
-
-		    while (rounded_freq <= 0)
-			{
-			    new_freq += FREQ_INCREASE_STEP;
-			    rounded_freq = dpll_mpu_clock->round_rate(dpll_mpu_clock, new_freq);
-			}
-
-		    temp_opp->rate = new_freq;
-
-		    frequency_table[i].frequency = temp_opp->rate / 1000;
-
-		    i++;
 		}
+
+	    *mpu_freqs[i] = new_freq;
+
+	    frequency_table[i].frequency = *mpu_freqs[i] / 1000;
 	}
 
     cpufreq_frequency_table_cpuinfo(freq_policy, frequency_table);
@@ -254,17 +334,153 @@ static ssize_t mpu_ocvalue_write(struct device * dev, struct device_attribute * 
     return size;
 }
 
+static void liveoc_core_update(void)
+{
+    int i;
+
+    unsigned long new_freq;
+
+    long rounded_freq;
+
+    dsscomp_early_suspend(NULL);
+
+    msleep(500);
+
+    mutex_lock(frequency_mutex);
+
+    omap_sr_disable_reset_volt(core_voltdm);
+    omap_voltage_calib_reset(core_voltdm);
+
+    new_freq = (original_core_freq / 100) * core_ocvalue;
+
+    rounded_freq = dpll_core_clock->round_rate(dpll_core_clock, new_freq);
+
+    while (rounded_freq <= 0)
+	{
+	    new_freq += FREQ_INCREASE_STEP;
+	    rounded_freq = dpll_core_clock->round_rate(dpll_core_clock, new_freq);
+	}
+
+    dpll_core_clock->set_rate(dpll_core_clock, new_freq);
+    dpll_corex2_clock->rate = dpll_core_clock->rate * 2;
+
+    for (i = 0; i < num_l3freqs; i++)
+	{
+	    *l3_freqs[i] = l3_clock->round_rate(l3_clock, (original_l3_freqs[i] / 100) * core_ocvalue);
+	}
+
+    omap_sr_enable(core_voltdm, omap_voltage_get_curr_vdata(core_voltdm));
+
+    mutex_unlock(frequency_mutex);
+
+    msleep(500);
+
+    dsscomp_late_resume(NULL);
+
+    return;
+}
+
+static ssize_t core_ocvalue_read(struct device * dev, struct device_attribute * attr, char * buf)
+{
+    return sprintf(buf, "%u\n", core_ocvalue);
+}
+
+static ssize_t core_ocvalue_write(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+    unsigned int data;
+
+    if(sscanf(buf, "%u\n", &data) == 1) 
+	{
+	    if (data >= 100 && data <= MAX_CORE_OCVALUE)
+		{
+		    if (data != core_ocvalue)
+			{
+			    core_ocvalue = data;
+		    
+			    liveoc_core_update();
+			}
+
+		    pr_info("LIVEOC CORE oc-value set to %u\n", core_ocvalue);
+		}
+	    else
+		{
+		    pr_info("%s: invalid input range %u\n", __FUNCTION__, data);
+		}
+	} 
+    else 
+	{
+	    pr_info("%s: invalid input\n", __FUNCTION__);
+	}
+
+    return size;
+}
+
+static void liveoc_gpu_update(void)
+{
+    mutex_lock(frequency_mutex);
+
+    omap_sr_disable_reset_volt(core_voltdm);
+    omap_voltage_calib_reset(core_voltdm);
+
+    *gpu_freq = gpu_freqs[gpu_performance];
+
+    omap_sr_enable(core_voltdm, omap_voltage_get_curr_vdata(core_voltdm));
+
+    mutex_unlock(frequency_mutex);
+
+    return;
+}
+
+static ssize_t gpu_performance_read(struct device * dev, struct device_attribute * attr, char * buf)
+{
+    return sprintf(buf, "%u (%lumhz)\n", gpu_performance, gpu_freqs[gpu_performance] / 1000000);
+}
+
+static ssize_t gpu_performance_write(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+    unsigned int data;
+
+    if(sscanf(buf, "%u\n", &data) == 1) 
+	{
+	    if (data <= MAX_GPU_PERFORMANCE)
+		{
+		    if (data != gpu_performance)
+			{
+			    gpu_performance = data;
+		    
+			    liveoc_gpu_update();
+			}
+
+		    pr_info("LIVEOC GPU performance set to %u\n", gpu_performance);
+		}
+	    else
+		{
+		    pr_info("%s: invalid input range %u\n", __FUNCTION__, data);
+		}
+	} 
+    else 
+	{
+	    pr_info("%s: invalid input\n", __FUNCTION__);
+	}
+
+    return size;
+}
+
 static ssize_t liveoc_version(struct device * dev, struct device_attribute * attr, char * buf)
 {
     return sprintf(buf, "%u\n", LIVEOC_VERSION);
 }
 
 static DEVICE_ATTR(mpu_ocvalue, S_IRUGO | S_IWUGO, mpu_ocvalue_read, mpu_ocvalue_write);
+static DEVICE_ATTR(core_ocvalue, S_IRUGO | S_IWUGO, core_ocvalue_read, core_ocvalue_write);
+static DEVICE_ATTR(gpu_performance, S_IRUGO | S_IWUGO, gpu_performance_read, gpu_performance_write);
 static DEVICE_ATTR(version, S_IRUGO , liveoc_version, NULL);
 
 static struct attribute *liveoc_attributes[] = 
     {
 	&dev_attr_mpu_ocvalue.attr,
+	&dev_attr_core_ocvalue.attr,
+	&dev_attr_gpu_performance.attr,
 	&dev_attr_version.attr,
 	NULL
     };

@@ -40,7 +40,11 @@
  * Determines the number of entries in the pointer array for register
  * cache
  */
+#ifdef CONFIG_LIVE_OC
+#define EMIF_MAX_NUM_FREQUENCIES	12
+#else
 #define EMIF_MAX_NUM_FREQUENCIES	6
+#endif
 /*
  * Indices into the Addressing Table array.
  * One entry each for all the different types of devices with different

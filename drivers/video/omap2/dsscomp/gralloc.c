@@ -448,7 +448,10 @@ static void dsscomp_early_suspend_cb(void *data, int status)
 	wake_up(&early_suspend_wq);
 }
 
-static void dsscomp_early_suspend(struct early_suspend *h)
+#ifndef CONFIG_LIVE_OC
+static 
+#endif
+void dsscomp_early_suspend(struct early_suspend *h)
 {
 	struct dsscomp_setup_dispc_data d = {
 		.num_mgrs = 0,
@@ -469,12 +472,21 @@ static void dsscomp_early_suspend(struct early_suspend *h)
 	else
 		pr_info("DSSCOMP: blanked screen\n");
 }
+#ifdef CONFIG_LIVE_OC
+EXPORT_SYMBOL(dsscomp_early_suspend);
+#endif
 
-static void dsscomp_late_resume(struct early_suspend *h)
+#ifndef CONFIG_LIVE_OC
+static 
+#endif
+void dsscomp_late_resume(struct early_suspend *h)
 {
 	pr_info("DSSCOMP: %s\n", __func__);
 	blanked = false;
 }
+#ifdef CONFIG_LIVE_OC
+EXPORT_SYMBOL(dsscomp_late_resume);
+#endif
 
 static struct early_suspend early_suspend_info = {
 	.suspend = dsscomp_early_suspend,

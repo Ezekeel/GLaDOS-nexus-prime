@@ -27,7 +27,7 @@
 #include "dvfs.h"
 
 #ifdef CONFIG_LIVE_OC
-extern void liveoc_register_oppdevice(struct device * dev, char * dev_name);
+#include <linux/live_oc.h>
 #endif
 
 #ifdef CONFIG_CUSTOM_VOLTAGE
