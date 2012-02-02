@@ -30,7 +30,12 @@
 
 #define FREQ_INCREASE_STEP 100000
 
-static int mpu_ocvalue = 100, core_ocvalue = 100, num_mpufreqs, num_l3freqs;
+#define MAX_GPU_PERFORMANCE 2
+
+static const long unsigned gpu_freqs[] = {307200000, 384000000, 512000000};
+
+static unsigned int mpu_ocvalue = 100, core_ocvalue = 100, gpu_performance = 0,
+    num_mpufreqs, num_l3freqs;
 
 static struct cpufreq_frequency_table * frequency_table = NULL;
 
@@ -61,6 +66,10 @@ static struct clk * dpll_core_clock = NULL;
 static struct clk * dpll_corex2_clock = NULL;
 
 static unsigned long original_core_freq;
+
+static struct device * gpu_device = NULL;
+
+static unsigned long * gpu_freq;
 
 static unsigned int * maximum_thermal = NULL;
 
@@ -125,11 +134,15 @@ void liveoc_register_oppdevice(struct device * dev, char * dev_name)
 	    if (!mpu_device)
 		mpu_device = dev;
 	}
-
-    if (!strcmp(dev_name, "l3_main_1"))
+    else if (!strcmp(dev_name, "l3_main_1"))
 	{
 	    if (!l3_device)
 		l3_device = dev;
+	}
+    else if (!strcmp(dev_name, "gpu"))
+	{
+	    if (!gpu_device)
+		gpu_device = dev;
 	}
 
     return;
@@ -208,6 +221,11 @@ void liveoc_init(void)
 		    i++;
 		}
 	}
+
+    temp_opp = opp_find_freq_exact(gpu_device, gpu_freqs[0], true);
+
+    gpu_freq = &(temp_opp->rate);
+
     return;
 }
 EXPORT_SYMBOL(liveoc_init);
@@ -217,6 +235,12 @@ int liveoc_core_ocvalue(void)
     return core_ocvalue;
 }
 EXPORT_SYMBOL(liveoc_core_ocvalue);
+
+unsigned long liveoc_gpu_freq(void)
+{
+    return gpu_freqs[gpu_performance];
+}
+EXPORT_SYMBOL(liveoc_gpu_freq);
 
 static void liveoc_mpu_update(void)
 {
@@ -391,6 +415,57 @@ static ssize_t core_ocvalue_write(struct device * dev, struct device_attribute *
     return size;
 }
 
+static void liveoc_gpu_update(void)
+{
+    mutex_lock(frequency_mutex);
+
+    omap_sr_disable_reset_volt(core_voltdm);
+    omap_voltage_calib_reset(core_voltdm);
+
+    *gpu_freq = gpu_freqs[gpu_performance];
+
+    omap_sr_enable(core_voltdm, omap_voltage_get_curr_vdata(core_voltdm));
+
+    mutex_unlock(frequency_mutex);
+
+    return;
+}
+
+static ssize_t gpu_performance_read(struct device * dev, struct device_attribute * attr, char * buf)
+{
+    return sprintf(buf, "%u (%lumhz)\n", gpu_performance, gpu_freqs[gpu_performance] / 1000000);
+}
+
+static ssize_t gpu_performance_write(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+    unsigned int data;
+
+    if(sscanf(buf, "%u\n", &data) == 1) 
+	{
+	    if (data <= MAX_GPU_PERFORMANCE)
+		{
+		    if (data != gpu_performance)
+			{
+			    gpu_performance = data;
+		    
+			    liveoc_gpu_update();
+			}
+
+		    pr_info("LIVEOC GPU performance set to %u\n", gpu_performance);
+		}
+	    else
+		{
+		    pr_info("%s: invalid input range %u\n", __FUNCTION__, data);
+		}
+	} 
+    else 
+	{
+	    pr_info("%s: invalid input\n", __FUNCTION__);
+	}
+
+    return size;
+}
+
 static ssize_t liveoc_version(struct device * dev, struct device_attribute * attr, char * buf)
 {
     return sprintf(buf, "%u\n", LIVEOC_VERSION);
@@ -398,12 +473,14 @@ static ssize_t liveoc_version(struct device * dev, struct device_attribute * att
 
 static DEVICE_ATTR(mpu_ocvalue, S_IRUGO | S_IWUGO, mpu_ocvalue_read, mpu_ocvalue_write);
 static DEVICE_ATTR(core_ocvalue, S_IRUGO | S_IWUGO, core_ocvalue_read, core_ocvalue_write);
+static DEVICE_ATTR(gpu_performance, S_IRUGO | S_IWUGO, gpu_performance_read, gpu_performance_write);
 static DEVICE_ATTR(version, S_IRUGO , liveoc_version, NULL);
 
 static struct attribute *liveoc_attributes[] = 
     {
 	&dev_attr_mpu_ocvalue.attr,
 	&dev_attr_core_ocvalue.attr,
+	&dev_attr_gpu_performance.attr,
 	&dev_attr_version.attr,
 	NULL
     };
