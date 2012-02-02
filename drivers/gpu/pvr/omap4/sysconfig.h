@@ -27,14 +27,12 @@
 #if !defined(__SOCCONFIG_H__)
 #define __SOCCONFIG_H__
 
-#include <linux/oc.h>
-
 #define VS_PRODUCT_NAME	"OMAP4"
 
 #if defined(SGX540) && (SGX_CORE_REV == 120)
-#define SYS_SGX_CLOCK_SPEED		3072000 * GPU_OC_VALUE
+#define SYS_SGX_CLOCK_SPEED		307200000
 #else
-#define SYS_SGX_CLOCK_SPEED		3047424 * GPU_OC_VALUE
+#define SYS_SGX_CLOCK_SPEED		304742400
 #endif
 
 #define SYS_SGX_HWRECOVERY_TIMEOUT_FREQ		(100)	

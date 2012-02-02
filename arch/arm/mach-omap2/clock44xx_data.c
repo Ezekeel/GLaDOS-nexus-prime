@@ -26,7 +26,6 @@
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/clk.h>
-#include <linux/oc.h>
 #include <plat/clkdev_omap.h>
 
 #include "clock.h"
@@ -452,8 +451,6 @@ static struct clk dpll_core_ck = {
 	.init		= &omap2_init_dpll_parent,
 	.ops		= &clkops_omap3_core_dpll_ops,
 	.recalc		= &omap3_dpll_recalc,
-	.round_rate	= &omap2_dpll_round_rate,
-	.set_rate	= &omap3_noncore_dpll_set_rate,
 };
 
 static struct clk dpll_core_x2_ck = {
@@ -3520,19 +3517,19 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK("omap_timer.8",	"sys_ck",	&syc_clk_div_ck,	CK_44XX),
 };
 
-#define L3_OPP50_RATE			(1000000 * GPU_OC_VALUE)
-#define DPLL_CORE_M2_OPP50_RATE		(4000000 * GPU_OC_VALUE)
-#define DPLL_CORE_M2_OPP100_RATE	(8000000 * GPU_OC_VALUE)
-#define DPLL_CORE_M3_OPP50_RATE		(2000000 * GPU_OC_VALUE)
-#define DPLL_CORE_M3_OPP100_RATE	(3200000 * GPU_OC_VALUE)
-#define DPLL_CORE_M6_OPP50_RATE		(2000000 * GPU_OC_VALUE)
-#define DPLL_CORE_M6_OPP100_RATE	(2666000 * GPU_OC_VALUE)
-#define DPLL_CORE_M7_OPP50_RATE		(1333333 * GPU_OC_VALUE)
-#define DPLL_CORE_M7_OPP100_RATE	(2666666 * GPU_OC_VALUE)
-#define DPLL_PER_M3_OPP50_RATE		(1920000 * GPU_OC_VALUE)
-#define DPLL_PER_M3_OPP100_RATE		(2560000 * GPU_OC_VALUE)
-#define DPLL_PER_M6_OPP50_RATE		(1920000 * GPU_OC_VALUE)
-#define DPLL_PER_M6_OPP100_RATE		(3840000 * GPU_OC_VALUE)
+#define L3_OPP50_RATE			100000000
+#define DPLL_CORE_M2_OPP50_RATE		400000000
+#define DPLL_CORE_M2_OPP100_RATE	800000000
+#define DPLL_CORE_M3_OPP50_RATE		200000000
+#define DPLL_CORE_M3_OPP100_RATE	320000000
+#define DPLL_CORE_M6_OPP50_RATE		200000000
+#define DPLL_CORE_M6_OPP100_RATE	266666666
+#define DPLL_CORE_M7_OPP50_RATE		133333333
+#define DPLL_CORE_M7_OPP100_RATE	266666666
+#define DPLL_PER_M3_OPP50_RATE		192000000
+#define DPLL_PER_M3_OPP100_RATE		256000000
+#define DPLL_PER_M6_OPP50_RATE		192000000
+#define DPLL_PER_M6_OPP100_RATE		384000000
 
 static long omap4_virt_l3_round_rate(struct clk *clk, unsigned long rate)
 {
@@ -3631,8 +3628,6 @@ int __init omap4xxx_clk_init(void)
 	struct omap_clk *c;
 	u32 cpu_clkflg = 0;
 
-	unsigned long new_rate;
-
 	if (cpu_is_omap443x()) {
 		cpu_mask = RATE_IN_443X;
 		cpu_clkflg = CK_443X;
@@ -3665,19 +3660,6 @@ int __init omap4xxx_clk_init(void)
 	 * enable other clocks as necessary
 	 */
 	clk_enable_init_clocks();
-
-	new_rate = (dpll_core_ck.rate / 100) * GPU_OC_VALUE;
-	dpll_core_ck.round_rate(&dpll_core_ck, new_rate);
-	dpll_core_ck.set_rate(&dpll_core_ck, new_rate);
-	dpll_core_x2_ck.rate = 2 * dpll_core_ck.rate;
-	
-	new_rate = (dpll_per_ck.rate / 100) * GPU_OC_VALUE;
-	dpll_per_ck.round_rate(&dpll_per_ck, new_rate);
-	dpll_per_ck.set_rate(&dpll_per_ck, new_rate);
-
-	new_rate = (dpll_iva_ck.rate / 100) * IVA_OC_VALUE;
-	dpll_iva_ck.round_rate(&dpll_iva_ck, new_rate);
-	dpll_iva_ck.set_rate(&dpll_iva_ck, new_rate);
 
 	return 0;
 }
