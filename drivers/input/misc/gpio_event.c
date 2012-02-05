@@ -25,6 +25,10 @@
 #include <linux/touch_wake.h>
 #endif
 
+#ifdef CONFIG_LIVE_OC
+#include <linux/live_oc.h>
+#endif
+
 struct gpio_event {
 	struct gpio_event_input_devs *input_devs;
 	const struct gpio_event_platform_data *info;
@@ -176,6 +180,12 @@ static int gpio_event_probe(struct platform_device *pdev)
 			pr_info("powerkey device set\n");
 
 			set_powerkeydev(input_dev);
+		    }
+#endif
+#ifdef CONFIG_LIVE_OC
+		if (!strcmp(input_dev->name, "tuna-gpio-keypad"))
+		    {
+			liveoc_register_powerkey(input_dev);
 		    }
 #endif
 	}
