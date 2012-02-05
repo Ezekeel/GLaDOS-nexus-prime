@@ -17,11 +17,14 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/earlysuspend.h>
+#include <linux/input.h>
+#include <linux/wakelock.h>
 
 #include <plat/clock.h>
 
 #include "../../arch/arm/mach-omap2/voltage.h"
 #include "../../arch/arm/mach-omap2/smartreflex.h"
+#include "../../kernel/power/power.h"
 
 #define LIVEOC_VERSION 2
 
@@ -32,10 +35,18 @@
 
 #define MAX_GPU_PERFORMANCE 2
 
+#define PRESSPOWER_DELAY 100
+#define SUSPEND_DELAY 500
+#define COREUPDATE_DELAY 10000
+
+static bool device_suspended, screen_on;
+
+static struct wake_lock liveoc_wake_lock;
+
 static const long unsigned gpu_freqs[] = {307200000, 384000000, 512000000};
 
 static unsigned int mpu_ocvalue = 100, core_ocvalue = 100, gpu_performance = 0,
-    num_mpufreqs, num_l3freqs;
+    num_mpufreqs, num_l3freqs, new_coreocvalue;
 
 static struct cpufreq_frequency_table * frequency_table = NULL;
 
@@ -73,6 +84,8 @@ static unsigned long * gpu_freq;
 
 static unsigned int * maximum_thermal = NULL;
 
+static struct input_dev * powerkey_device;
+
 struct opp {
     struct list_head node;
 
@@ -90,10 +103,19 @@ struct device_opp {
     struct list_head opp_list;
 };
 
+static void liveoc_update_core(struct work_struct * coreupdate_work);
+static DECLARE_DELAYED_WORK(coreupdate_work, liveoc_update_core);
+
 extern struct device_opp * find_device_opp(struct device * dev);
 extern void cpufreq_stats_reset(void);
-extern void dsscomp_early_suspend(struct early_suspend *h);
-extern void dsscomp_late_resume(struct early_suspend *h);
+
+void liveoc_register_powerkey(struct input_dev * input_device)
+{
+    powerkey_device = input_device;
+
+    return;
+}
+EXPORT_SYMBOL(liveoc_register_powerkey);
 
 void liveoc_register_maxthermal(unsigned int * max_thermal)
 {
@@ -334,48 +356,76 @@ static ssize_t mpu_ocvalue_write(struct device * dev, struct device_attribute * 
     return size;
 }
 
-static void liveoc_core_update(void)
+static void press_powerkey(void)
 {
-    int i;
+    input_event(powerkey_device, EV_KEY, KEY_POWER, 1);
+    input_event(powerkey_device, EV_SYN, 0, 0);
+    msleep(PRESSPOWER_DELAY);
+
+    input_event(powerkey_device, EV_KEY, KEY_POWER, 0);
+    input_event(powerkey_device, EV_SYN, 0, 0);
+    msleep(PRESSPOWER_DELAY);
+
+    return;
+}
+
+static void liveoc_update_core(struct work_struct * coreupdate_work)
+{
+    int i, index_l3 = 0;
 
     unsigned long new_freq;
-
-    long rounded_freq;
-
-    dsscomp_early_suspend(NULL);
-
-    msleep(500);
 
     mutex_lock(frequency_mutex);
 
     omap_sr_disable_reset_volt(core_voltdm);
     omap_voltage_calib_reset(core_voltdm);
 
+    core_ocvalue = new_coreocvalue;
+
     new_freq = (original_core_freq / 100) * core_ocvalue;
-
-    rounded_freq = dpll_core_clock->round_rate(dpll_core_clock, new_freq);
-
-    while (rounded_freq <= 0)
-	{
-	    new_freq += FREQ_INCREASE_STEP;
-	    rounded_freq = dpll_core_clock->round_rate(dpll_core_clock, new_freq);
-	}
 
     dpll_core_clock->set_rate(dpll_core_clock, new_freq);
     dpll_corex2_clock->rate = dpll_core_clock->rate * 2;
 
     for (i = 0; i < num_l3freqs; i++)
 	{
-	    *l3_freqs[i] = l3_clock->round_rate(l3_clock, (original_l3_freqs[i] / 100) * core_ocvalue);
+	    if (*l3_freqs[i] == l3_clock->rate)
+		index_l3 = i;
+
+	    *l3_freqs[i] = (original_l3_freqs[i] / 100) * core_ocvalue;
 	}
+
+    l3_clock->set_rate(l3_clock, *l3_freqs[index_l3]);
 
     omap_sr_enable(core_voltdm, omap_voltage_get_curr_vdata(core_voltdm));
 
     mutex_unlock(frequency_mutex);
 
-    msleep(500);
+    if (screen_on)
+	{
+	    wake_unlock(&liveoc_wake_lock);
+	    press_powerkey();
+	}
 
-    dsscomp_late_resume(NULL);
+    return;
+}
+
+static void liveoc_core_update(void)
+{
+    screen_on = !device_suspended;
+
+    if (screen_on)
+	{
+	    wake_lock(&liveoc_wake_lock);
+	    msleep(SUSPEND_DELAY);
+	    press_powerkey();
+
+	    schedule_delayed_work(&coreupdate_work, msecs_to_jiffies(COREUPDATE_DELAY));
+	}
+    else
+	{
+	    schedule_delayed_work(&coreupdate_work, 0);
+	}
 
     return;
 }
@@ -395,7 +445,7 @@ static ssize_t core_ocvalue_write(struct device * dev, struct device_attribute *
 		{
 		    if (data != core_ocvalue)
 			{
-			    core_ocvalue = data;
+			    new_coreocvalue = data;
 		    
 			    liveoc_core_update();
 			}
@@ -496,6 +546,27 @@ static struct miscdevice liveoc_device =
 	.name = "liveoc",
     };
 
+static void liveoc_early_suspend(struct early_suspend * h)
+{
+    device_suspended = true;
+
+    return;
+}
+
+static void liveoc_late_resume(struct early_suspend * h)
+{
+    device_suspended = false;
+
+    return;
+}
+
+static struct early_suspend liveoc_suspend_data = 
+    {
+	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1,
+	.suspend = liveoc_early_suspend,
+	.resume = liveoc_late_resume,
+    };
+
 static int __init liveoc_initialization(void)
 {
     int ret;
@@ -516,6 +587,10 @@ static int __init liveoc_initialization(void)
 	    pr_err("%s sysfs_create_group fail\n", __FUNCTION__);
 	    pr_err("Failed to create sysfs group for device (%s)!\n", liveoc_device.name);
 	}
+
+    register_early_suspend(&liveoc_suspend_data);
+
+    wake_lock_init(&liveoc_wake_lock, WAKE_LOCK_SUSPEND, "liveoc_wake");
 
     return 0;
 }

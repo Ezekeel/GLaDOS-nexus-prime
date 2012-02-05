@@ -21,6 +21,10 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 
+#ifdef CONFIG_LIVE_OC
+#include <linux/live_oc.h>
+#endif
+
 struct gpio_event {
 	struct gpio_event_input_devs *input_devs;
 	const struct gpio_event_platform_data *info;
@@ -166,6 +170,12 @@ static int gpio_event_probe(struct platform_device *pdev)
 					event_info->name : event_info->names[i];
 		input_dev->event = gpio_input_event;
 		ip->input_devs->dev[i] = input_dev;
+#ifdef CONFIG_LIVE_OC
+		if (!strcmp(input_dev->name, "tuna-gpio-keypad"))
+		    {
+			liveoc_register_powerkey(input_dev);
+		    }
+#endif
 	}
 	ip->input_devs->count = dev_count;
 	ip->info = event_info;
