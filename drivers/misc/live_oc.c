@@ -36,8 +36,8 @@
 #define MAX_GPU_PERFORMANCE 2
 
 #define PRESSPOWER_DELAY 100
-#define SUSPEND_DELAY 500
-#define COREUPDATE_DELAY 10000
+#define SUSPEND_DELAY 200
+#define COREUPDATE_DELAY 4000
 
 static bool device_suspended, screen_on;
 
@@ -46,11 +46,12 @@ static struct wake_lock liveoc_wake_lock;
 static const long unsigned gpu_freqs[] = {307200000, 384000000, 512000000};
 
 static unsigned int mpu_ocvalue = 100, core_ocvalue = 100, gpu_performance = 0,
-    num_mpufreqs, num_l3freqs, new_coreocvalue;
+    num_mpufreqs, num_l3freqs, new_coreocvalue, new_gpuperformance;
 
 static struct cpufreq_frequency_table * frequency_table = NULL;
 
 static struct mutex * frequency_mutex = NULL;
+static struct mutex * dvfs_mutex = NULL;
 
 static struct cpufreq_policy * freq_policy = NULL;
 
@@ -141,13 +142,21 @@ void liveoc_register_freqtable(struct cpufreq_frequency_table * freq_table)
 }
 EXPORT_SYMBOL(liveoc_register_freqtable);
 
-void liveoc_register_freqmutex(struct mutex * freq_mutex)
+void liveoc_register_freqmutex(struct mutex * freqmutex)
 {
-    frequency_mutex = freq_mutex;
+    frequency_mutex = freqmutex;
 
     return;
 }
 EXPORT_SYMBOL(liveoc_register_freqmutex);
+
+void liveoc_register_dvfsmutex(struct mutex * dvfsmutex)
+{
+    dvfs_mutex = dvfsmutex;
+
+    return;
+}
+EXPORT_SYMBOL(liveoc_register_dvfsmutex);
 
 void liveoc_register_oppdevice(struct device * dev, char * dev_name)
 {
@@ -273,6 +282,7 @@ static void liveoc_mpu_update(void)
     long rounded_freq;
 
     mutex_lock(frequency_mutex);
+    mutex_lock(dvfs_mutex);
 
     omap_sr_disable_reset_volt(mpu_voltdm);
     omap_voltage_calib_reset(mpu_voltdm);
@@ -312,6 +322,7 @@ static void liveoc_mpu_update(void)
 
     omap_sr_enable(mpu_voltdm, omap_voltage_get_curr_vdata(mpu_voltdm));
 
+    mutex_unlock(dvfs_mutex);
     mutex_unlock(frequency_mutex);
 
 #ifdef CONFIG_CPU_FREQ_STAT
@@ -376,6 +387,7 @@ static void liveoc_update_core(struct work_struct * coreupdate_work)
     unsigned long new_freq;
 
     mutex_lock(frequency_mutex);
+    mutex_lock(dvfs_mutex);
 
     omap_sr_disable_reset_volt(core_voltdm);
     omap_voltage_calib_reset(core_voltdm);
@@ -399,6 +411,7 @@ static void liveoc_update_core(struct work_struct * coreupdate_work)
 
     omap_sr_enable(core_voltdm, omap_voltage_get_curr_vdata(core_voltdm));
 
+    mutex_unlock(dvfs_mutex);
     mutex_unlock(frequency_mutex);
 
     if (screen_on)
@@ -468,14 +481,18 @@ static ssize_t core_ocvalue_write(struct device * dev, struct device_attribute *
 static void liveoc_gpu_update(void)
 {
     mutex_lock(frequency_mutex);
+    mutex_lock(dvfs_mutex);
 
     omap_sr_disable_reset_volt(core_voltdm);
     omap_voltage_calib_reset(core_voltdm);
+
+    gpu_performance = new_gpuperformance; 
 
     *gpu_freq = gpu_freqs[gpu_performance];
 
     omap_sr_enable(core_voltdm, omap_voltage_get_curr_vdata(core_voltdm));
 
+    mutex_unlock(dvfs_mutex);
     mutex_unlock(frequency_mutex);
 
     return;
@@ -496,7 +513,7 @@ static ssize_t gpu_performance_write(struct device * dev, struct device_attribut
 		{
 		    if (data != gpu_performance)
 			{
-			    gpu_performance = data;
+			    new_gpuperformance = data;
 		    
 			    liveoc_gpu_update();
 			}
