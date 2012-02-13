@@ -350,9 +350,9 @@ static ssize_t mpu_ocvalue_write(struct device * dev, struct device_attribute * 
 			    mpu_ocvalue = data;
 		    
 			    liveoc_mpu_update();
-			}
 
-		    pr_info("LIVEOC MPU oc-value set to %u\n", mpu_ocvalue);
+			    pr_info("LIVEOC MPU oc-value set to %u\n", mpu_ocvalue);
+			}
 		}
 	    else
 		{
@@ -414,6 +414,8 @@ static void liveoc_update_core(struct work_struct * coreupdate_work)
     mutex_unlock(dvfs_mutex);
     mutex_unlock(frequency_mutex);
 
+    pr_info("LIVEOC CORE oc-value set to %u\n", core_ocvalue);
+
     if (screen_on)
 	{
 	    wake_unlock(&liveoc_wake_lock);
@@ -459,11 +461,11 @@ static ssize_t core_ocvalue_write(struct device * dev, struct device_attribute *
 		    if (data != core_ocvalue)
 			{
 			    new_coreocvalue = data;
-		    
+
+			    pr_info("LIVEOC preparing to change CORE oc-value to %u\n", new_coreocvalue);
+
 			    liveoc_core_update();
 			}
-
-		    pr_info("LIVEOC CORE oc-value set to %u\n", core_ocvalue);
 		}
 	    else
 		{
@@ -516,9 +518,9 @@ static ssize_t gpu_performance_write(struct device * dev, struct device_attribut
 			    new_gpuperformance = data;
 		    
 			    liveoc_gpu_update();
-			}
 
-		    pr_info("LIVEOC GPU performance set to %u\n", gpu_performance);
+			    pr_info("LIVEOC GPU performance set to %u\n", gpu_performance);
+			}
 		}
 	    else
 		{
