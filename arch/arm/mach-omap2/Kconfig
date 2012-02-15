@@ -413,6 +413,13 @@ config OMAP_SCALING_FREQS
 	  Enable support for showing the available CPU frequencies by adding 
 	  the entry 'scaling_available_frequencies' to the sysfs interface.
 
+config OMAP_OVERRIDE_MPUTRIM
+	bool "Override factory-set trim value for MPU DPLL clock"
+	default n
+	help
+	  Override factory-set trim value for MPU DPLL to allow locking at 
+	  rates >2.4GHz (required for MPU frequencies >1.2GHz).
+
 endmenu
 
 endif
