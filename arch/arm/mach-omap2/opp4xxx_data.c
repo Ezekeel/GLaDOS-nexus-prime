@@ -165,12 +165,18 @@ static struct omap_opp_def __initdata omap443x_opp_def_list[] = {
 #define OMAP4460_VDD_MPU_OPP100_UV		1203000
 #define OMAP4460_VDD_MPU_OPPTURBO_UV		1317000
 #define OMAP4460_VDD_MPU_OPPNITRO_UV		1380000
+#ifdef CONFIG_OMAP_OC_FREQSLOT
+#define OMAP4460_VDD_MPU_OPPNITRO_UV_OC		1381000
+#endif
 
 struct omap_volt_data omap446x_vdd_mpu_volt_data[] = {
 	VOLT_DATA_DEFINE(OMAP4460_VDD_MPU_OPP50_UV, OMAP44XX_CONTROL_FUSE_MPU_OPP50, 0xf4, 0x0c, OMAP_ABB_NOMINAL_OPP),
 	VOLT_DATA_DEFINE(OMAP4460_VDD_MPU_OPP100_UV, OMAP44XX_CONTROL_FUSE_MPU_OPP100, 0xf9, 0x16, OMAP_ABB_NOMINAL_OPP),
 	VOLT_DATA_DEFINE(OMAP4460_VDD_MPU_OPPTURBO_UV, OMAP44XX_CONTROL_FUSE_MPU_OPPTURBO, 0xfa, 0x23, OMAP_ABB_NOMINAL_OPP),
 	VOLT_DATA_DEFINE(OMAP4460_VDD_MPU_OPPNITRO_UV, OMAP44XX_CONTROL_FUSE_MPU_OPPNITRO, 0xfa, 0x27, OMAP_ABB_FAST_OPP),
+#ifdef CONFIG_OMAP_OC_FREQSLOT
+	VOLT_DATA_DEFINE(OMAP4460_VDD_MPU_OPPNITRO_UV_OC, OMAP44XX_CONTROL_FUSE_MPU_OPPNITRO, 0xfa, 0x27, OMAP_ABB_FAST_OPP),
+#endif
 	VOLT_DATA_DEFINE(0, 0, 0, 0, 0),
 };
 
@@ -204,6 +210,9 @@ static struct omap_vdd_dep_volt omap446x_vdd_mpu_core_dep_data[] = {
 	{.main_vdd_volt = OMAP4460_VDD_MPU_OPP100_UV, .dep_vdd_volt = OMAP4460_VDD_CORE_OPP100_UV},
 	{.main_vdd_volt = OMAP4460_VDD_MPU_OPPTURBO_UV, .dep_vdd_volt = OMAP4460_VDD_CORE_OPP100_UV},
 	{.main_vdd_volt = OMAP4460_VDD_MPU_OPPNITRO_UV, .dep_vdd_volt = OMAP4460_VDD_CORE_OPP100_UV},
+#ifdef CONFIG_OMAP_OC_FREQSLOT
+	{.main_vdd_volt = OMAP4460_VDD_MPU_OPPNITRO_UV_OC, .dep_vdd_volt = OMAP4460_VDD_CORE_OPP100_UV},
+#endif
 };
 
 struct omap_vdd_dep_info omap446x_vddmpu_dep_info[] = {
@@ -240,6 +249,9 @@ static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
 	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", true, 920000000, OMAP4460_VDD_MPU_OPPTURBO_UV),
 	/* MPU OPP4 - OPP-Nitro */
 	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", false, 1200000000, OMAP4460_VDD_MPU_OPPNITRO_UV),
+#ifdef CONFIG_OMAP_OC_FREQSLOT
+	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", false, 1400000000, OMAP4460_VDD_MPU_OPPNITRO_UV_OC),
+#endif
 	/* MPU OPP4 - OPP-Nitro SpeedBin */
 	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", false, 1500000000, OMAP4460_VDD_MPU_OPPNITRO_UV),
 	/* L3 OPP1 - OPP50 */
@@ -332,6 +344,9 @@ int __init omap4_opp_init(void)
 	if (!r) {
 		if (omap4_has_mpu_1_2ghz())
 			omap4_mpu_opp_enable(1200000000);
+#ifdef CONFIG_OMAP_OC_FREQSLOT
+		omap4_mpu_opp_enable(1400000000);
+#endif
 		/* The tuna PCB doesn't support 1.5GHz, so disable it for now */
 		/*if (omap4_has_mpu_1_5ghz())
 			omap4_mpu_opp_enable(1500000000);*/
