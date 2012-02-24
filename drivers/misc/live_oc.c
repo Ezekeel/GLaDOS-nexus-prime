@@ -84,6 +84,7 @@ static struct device * gpu_device = NULL;
 static unsigned long * gpu_freq;
 
 static unsigned int * maximum_thermal = NULL;
+static unsigned int * maximum_freq = NULL;
 
 static struct input_dev * powerkey_device;
 
@@ -125,6 +126,14 @@ void liveoc_register_maxthermal(unsigned int * max_thermal)
     return;
 }
 EXPORT_SYMBOL(liveoc_register_maxthermal);
+
+void liveoc_register_maxfreq(unsigned int * max_freq)
+{
+    maximum_freq = max_freq;
+
+    return;
+}
+EXPORT_SYMBOL(liveoc_register_maxfreq);
 
 void liveoc_register_freqpolicy(struct cpufreq_policy * policy)
 {
@@ -275,7 +284,7 @@ EXPORT_SYMBOL(liveoc_gpu_freq);
 
 static void liveoc_mpu_update(void)
 {
-    int i, index_min = 0, index_max = 0, index_maxthermal = 0;
+    int i, index_min = 0, index_max = 0, index_maxthermal = 0, index_maxfreq = 0;
 
     unsigned long new_freq;
 
@@ -298,6 +307,9 @@ static void liveoc_mpu_update(void)
 	    if (frequency_table[i].frequency == *(maximum_thermal))
 		index_maxthermal = i;
 
+	    if (frequency_table[i].frequency == *(maximum_freq))
+		index_maxfreq = i;
+
 	    new_freq = (original_mpu_freqs[i] / 100) * mpu_ocvalue;
 
 	    rounded_freq = dpll_mpu_clock->round_rate(dpll_mpu_clock, new_freq);
@@ -319,6 +331,7 @@ static void liveoc_mpu_update(void)
     freq_policy->user_policy.max = frequency_table[index_max].frequency;
 
     *(maximum_thermal) = frequency_table[index_maxthermal].frequency;
+    *(maximum_freq) = frequency_table[index_maxfreq].frequency;
 
     omap_sr_enable(mpu_voltdm, omap_voltage_get_curr_vdata(mpu_voltdm));
 
