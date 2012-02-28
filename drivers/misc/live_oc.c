@@ -37,7 +37,7 @@
 
 #define PRESSPOWER_DELAY 100
 #define SUSPEND_DELAY 200
-#define COREUPDATE_DELAY 4000
+#define COREUPDATE_DELAY 5000
 
 static bool device_suspended, screen_on;
 
