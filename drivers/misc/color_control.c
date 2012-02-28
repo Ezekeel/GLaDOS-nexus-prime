@@ -11,7 +11,7 @@
 #include <linux/device.h>
 #include <linux/miscdevice.h>
 
-#define COLORCONTROL_VERSION 3
+#define COLORCONTROL_VERSION 4
 
 extern void colorcontrol_update(bool multiplier_updated);
 
@@ -159,6 +159,11 @@ static ssize_t colorcontrol_safety_write(struct device * dev, struct device_attr
     return size;
 }
 
+static ssize_t colorcontrol_originalmultiplier_read(struct device * dev, struct device_attribute * attr, char * buf)
+{
+    return sprintf(buf, "%u %u %u\n", original_multiplier[0], original_multiplier[1], original_multiplier[2]);
+}
+
 static ssize_t colorcontrol_version(struct device * dev, struct device_attribute * attr, char * buf)
 {
     return sprintf(buf, "%u\n", COLORCONTROL_VERSION);
@@ -167,6 +172,7 @@ static ssize_t colorcontrol_version(struct device * dev, struct device_attribute
 static DEVICE_ATTR(v1_offset, S_IRUGO | S_IWUGO, colorcontrol_offset_read, colorcontrol_offset_write);
 static DEVICE_ATTR(multiplier, S_IRUGO | S_IWUGO, colorcontrol_multiplier_read, colorcontrol_multiplier_write);
 static DEVICE_ATTR(safety_enabled, S_IRUGO | S_IWUGO, colorcontrol_safety_read, colorcontrol_safety_write);
+static DEVICE_ATTR(original_multiplier, S_IRUGO, colorcontrol_originalmultiplier_read, NULL);
 static DEVICE_ATTR(version, S_IRUGO , colorcontrol_version, NULL);
 
 static struct attribute *colorcontrol_attributes[] = 
@@ -174,6 +180,7 @@ static struct attribute *colorcontrol_attributes[] =
 	&dev_attr_v1_offset.attr,
 	&dev_attr_multiplier.attr,
 	&dev_attr_safety_enabled.attr,
+	&dev_attr_original_multiplier.attr,
 	&dev_attr_version.attr,
 	NULL
     };
