@@ -46,7 +46,7 @@ static struct wake_lock liveoc_wake_lock;
 static const long unsigned gpu_freqs[] = {307200000, 384000000, 512000000};
 
 static unsigned int mpu_ocvalue = 100, core_ocvalue = 100, gpu_performance = 0,
-    num_mpufreqs, num_l3freqs, new_coreocvalue, new_gpuperformance;
+    num_mpufreqs, num_l3freqs, new_coreocvalue = 100, new_gpuperformance = 0;
 
 static struct cpufreq_frequency_table * frequency_table = NULL;
 
@@ -460,7 +460,7 @@ static void liveoc_core_update(void)
 
 static ssize_t core_ocvalue_read(struct device * dev, struct device_attribute * attr, char * buf)
 {
-    return sprintf(buf, "%u\n", core_ocvalue);
+    return sprintf(buf, "%u\n", new_coreocvalue);
 }
 
 static ssize_t core_ocvalue_write(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
@@ -515,7 +515,7 @@ static void liveoc_gpu_update(void)
 
 static ssize_t gpu_performance_read(struct device * dev, struct device_attribute * attr, char * buf)
 {
-    return sprintf(buf, "%u (%lumhz)\n", gpu_performance, gpu_freqs[gpu_performance] / 1000000);
+    return sprintf(buf, "%u (%lumhz)\n", new_gpuperformance, gpu_freqs[new_gpuperformance] / 1000000);
 }
 
 static ssize_t gpu_performance_write(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
