@@ -37,7 +37,7 @@
 
 #define PRESSPOWER_DELAY 100
 #define SUSPEND_DELAY 200
-#define COREUPDATE_DELAY 4000
+#define COREUPDATE_DELAY 5000
 
 static bool device_suspended, screen_on;
 
@@ -46,7 +46,7 @@ static struct wake_lock liveoc_wake_lock;
 static const long unsigned gpu_freqs[] = {307200000, 384000000, 512000000};
 
 static unsigned int mpu_ocvalue = 100, core_ocvalue = 100, gpu_performance = 0,
-    num_mpufreqs, num_l3freqs, new_coreocvalue, new_gpuperformance;
+    num_mpufreqs, num_l3freqs, new_coreocvalue = 100, new_gpuperformance = 0;
 
 static struct cpufreq_frequency_table * frequency_table = NULL;
 
@@ -84,6 +84,7 @@ static struct device * gpu_device = NULL;
 static unsigned long * gpu_freq;
 
 static unsigned int * maximum_thermal = NULL;
+static unsigned int * maximum_freq = NULL;
 
 static struct input_dev * powerkey_device;
 
@@ -125,6 +126,14 @@ void liveoc_register_maxthermal(unsigned int * max_thermal)
     return;
 }
 EXPORT_SYMBOL(liveoc_register_maxthermal);
+
+void liveoc_register_maxfreq(unsigned int * max_freq)
+{
+    maximum_freq = max_freq;
+
+    return;
+}
+EXPORT_SYMBOL(liveoc_register_maxfreq);
 
 void liveoc_register_freqpolicy(struct cpufreq_policy * policy)
 {
@@ -275,7 +284,7 @@ EXPORT_SYMBOL(liveoc_gpu_freq);
 
 static void liveoc_mpu_update(void)
 {
-    int i, index_min = 0, index_max = 0, index_maxthermal = 0;
+    int i, index_min = 0, index_max = 0, index_maxthermal = 0, index_maxfreq = 0;
 
     unsigned long new_freq;
 
@@ -298,6 +307,9 @@ static void liveoc_mpu_update(void)
 	    if (frequency_table[i].frequency == *(maximum_thermal))
 		index_maxthermal = i;
 
+	    if (frequency_table[i].frequency == *(maximum_freq))
+		index_maxfreq = i;
+
 	    new_freq = (original_mpu_freqs[i] / 100) * mpu_ocvalue;
 
 	    rounded_freq = dpll_mpu_clock->round_rate(dpll_mpu_clock, new_freq);
@@ -319,6 +331,7 @@ static void liveoc_mpu_update(void)
     freq_policy->user_policy.max = frequency_table[index_max].frequency;
 
     *(maximum_thermal) = frequency_table[index_maxthermal].frequency;
+    *(maximum_freq) = frequency_table[index_maxfreq].frequency;
 
     omap_sr_enable(mpu_voltdm, omap_voltage_get_curr_vdata(mpu_voltdm));
 
@@ -447,7 +460,7 @@ static void liveoc_core_update(void)
 
 static ssize_t core_ocvalue_read(struct device * dev, struct device_attribute * attr, char * buf)
 {
-    return sprintf(buf, "%u\n", core_ocvalue);
+    return sprintf(buf, "%u\n", new_coreocvalue);
 }
 
 static ssize_t core_ocvalue_write(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
@@ -502,7 +515,7 @@ static void liveoc_gpu_update(void)
 
 static ssize_t gpu_performance_read(struct device * dev, struct device_attribute * attr, char * buf)
 {
-    return sprintf(buf, "%u (%lumhz)\n", gpu_performance, gpu_freqs[gpu_performance] / 1000000);
+    return sprintf(buf, "%u (%lumhz)\n", new_gpuperformance, gpu_freqs[new_gpuperformance] / 1000000);
 }
 
 static ssize_t gpu_performance_write(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
