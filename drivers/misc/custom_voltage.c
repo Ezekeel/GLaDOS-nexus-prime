@@ -590,7 +590,7 @@ ssize_t customvoltage_mpuvolt_read(struct device * dev, struct device_attribute 
 {
     int i, j = 0;
 
-    for (i = num_mpuvolt - 1; i >= 0; i--)
+    for (i = num_mpufreqs - 1; i >= 0; i--)
 	{
 	    j += sprintf(&buf[j], "%lumhz: %lu mV\n", mpu_opp[i]->rate / 1000000, (long unsigned)(*mpu_voltages[i] / 1000));
 	}
@@ -667,12 +667,12 @@ ssize_t customvoltage_mpuvolt_write(struct device * dev, struct device_attribute
 
 		    if (sscanf(buffer, "%lu", &voltage) == 1)
 			{
-			    new_voltages[num_mpuvolt - 1 - next_volt] = voltage * 1000;
+			    new_voltages[num_mpufreqs - 1 - next_volt] = voltage * 1000;
 		
 			    next_volt++;
 			}
 
-		    if (buf[i] == '\0' || next_volt >= num_mpuvolt)
+		    if (buf[i] == '\0' || next_volt >= num_mpufreqs)
 			{
 			    break;
 			}
@@ -681,7 +681,7 @@ ssize_t customvoltage_mpuvolt_write(struct device * dev, struct device_attribute
 		}
 	}
 
-    for (i = 0; i < num_mpuvolt - next_volt; i++)
+    for (i = 0; i < num_mpufreqs - next_volt; i++)
 	new_voltages[i] = *mpu_voltages[i];
 
     customvoltage_mpuvolt_update();
