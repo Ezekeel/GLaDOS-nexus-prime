@@ -375,7 +375,6 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
 #ifdef CONFIG_LIVE_OC
 	liveoc_register_maxthermal(&max_thermal);
 	liveoc_register_maxfreq(&max_freq);
-	liveoc_register_freqpolicy(policy);
 	liveoc_register_freqtable(freq_table);
 	liveoc_register_freqmutex(&omap_cpufreq_lock);
 #endif

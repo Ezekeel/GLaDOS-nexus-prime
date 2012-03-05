@@ -53,8 +53,6 @@ static struct cpufreq_frequency_table * frequency_table = NULL;
 static struct mutex * frequency_mutex = NULL;
 static struct mutex * dvfs_mutex = NULL;
 
-static struct cpufreq_policy * freq_policy = NULL;
-
 static unsigned long * original_mpu_freqs;
 
 static unsigned long ** mpu_freqs;
@@ -110,6 +108,8 @@ static DECLARE_DELAYED_WORK(coreupdate_work, liveoc_update_core);
 
 extern struct device_opp * find_device_opp(struct device * dev);
 extern void cpufreq_stats_reset(void);
+extern void lock_policy_rwsem_write(int cpu);
+void unlock_policy_rwsem_write(int cpu);
 
 void liveoc_register_powerkey(struct input_dev * input_device)
 {
@@ -134,14 +134,6 @@ void liveoc_register_maxfreq(unsigned int * max_freq)
     return;
 }
 EXPORT_SYMBOL(liveoc_register_maxfreq);
-
-void liveoc_register_freqpolicy(struct cpufreq_policy * policy)
-{
-    freq_policy = policy;
-
-    return;
-}
-EXPORT_SYMBOL(liveoc_register_freqpolicy);
 
 void liveoc_register_freqtable(struct cpufreq_frequency_table * freq_table)
 {
@@ -290,18 +282,22 @@ static void liveoc_mpu_update(void)
 
     long rounded_freq;
 
+    struct cpufreq_policy * policy;
+
     mutex_lock(frequency_mutex);
     mutex_lock(dvfs_mutex);
 
     omap_sr_disable_reset_volt(mpu_voltdm);
     omap_voltage_calib_reset(mpu_voltdm);
 
+    policy = cpufreq_cpu_get(0);
+
     for (i = 0; i < num_mpufreqs; i++)
 	{
-	    if (frequency_table[i].frequency == freq_policy->user_policy.min)
+	    if (frequency_table[i].frequency == policy->user_policy.min)
 		index_min = i;
 
-	    if (frequency_table[i].frequency == freq_policy->user_policy.max)
+	    if (frequency_table[i].frequency == policy->user_policy.max)
 		index_max = i;
 
 	    if (frequency_table[i].frequency == *(maximum_thermal))
@@ -325,13 +321,19 @@ static void liveoc_mpu_update(void)
 	    frequency_table[i].frequency = *mpu_freqs[i] / 1000;
 	}
 
-    cpufreq_frequency_table_cpuinfo(freq_policy, frequency_table);
+    lock_policy_rwsem_write(policy->cpu);
+    
+    cpufreq_frequency_table_cpuinfo(policy, frequency_table);
 
-    freq_policy->user_policy.min = frequency_table[index_min].frequency;
-    freq_policy->user_policy.max = frequency_table[index_max].frequency;
+    policy->user_policy.min = frequency_table[index_min].frequency;
+    policy->user_policy.max = frequency_table[index_max].frequency;
 
     *(maximum_thermal) = frequency_table[index_maxthermal].frequency;
     *(maximum_freq) = frequency_table[index_maxfreq].frequency;
+
+    unlock_policy_rwsem_write(policy->cpu);
+
+    cpufreq_cpu_put(policy);
 
     omap_sr_enable(mpu_voltdm, omap_voltage_get_curr_vdata(mpu_voltdm));
 
