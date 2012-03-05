@@ -68,7 +68,7 @@ static DEFINE_PER_CPU(int, cpufreq_policy_cpu);
 static DEFINE_PER_CPU(struct rw_semaphore, cpu_policy_rwsem);
 
 #define lock_policy_rwsem(mode, cpu)					\
-int lock_policy_rwsem_##mode					\
+static int lock_policy_rwsem_##mode					\
 (int cpu)								\
 {									\
 	int policy_cpu = per_cpu(cpufreq_policy_cpu, cpu);		\
@@ -82,15 +82,9 @@ int lock_policy_rwsem_##mode					\
 	return 0;							\
 }
 
-static lock_policy_rwsem(read, cpu);
+lock_policy_rwsem(read, cpu);
 
-#ifndef CONFIG_LIVE_OC
-static 
-#endif
 lock_policy_rwsem(write, cpu);
-#ifdef CONFIG_LIVE_OC
-EXPORT_SYMBOL(lock_policy_rwsem_write);
-#endif
 
 static void unlock_policy_rwsem_read(int cpu)
 {
@@ -99,18 +93,13 @@ static void unlock_policy_rwsem_read(int cpu)
 	up_read(&per_cpu(cpu_policy_rwsem, policy_cpu));
 }
 
-#ifndef CONFIG_LIVE_OC
-static 
-#endif
-void unlock_policy_rwsem_write(int cpu)
+static void unlock_policy_rwsem_write(int cpu)
 {
 	int policy_cpu = per_cpu(cpufreq_policy_cpu, cpu);
 	BUG_ON(policy_cpu == -1);
 	up_write(&per_cpu(cpu_policy_rwsem, policy_cpu));
 }
-#ifdef CONFIG_LIVE_OC
-EXPORT_SYMBOL(unlock_policy_rwsem_write);
-#endif
+
 
 /* internal prototypes */
 static int __cpufreq_governor(struct cpufreq_policy *policy,

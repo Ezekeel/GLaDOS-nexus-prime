@@ -108,8 +108,6 @@ static DECLARE_DELAYED_WORK(coreupdate_work, liveoc_update_core);
 
 extern struct device_opp * find_device_opp(struct device * dev);
 extern void cpufreq_stats_reset(void);
-extern void lock_policy_rwsem_write(int cpu);
-void unlock_policy_rwsem_write(int cpu);
 
 void liveoc_register_powerkey(struct input_dev * input_device)
 {
@@ -321,19 +319,13 @@ static void liveoc_mpu_update(void)
 	    frequency_table[i].frequency = *mpu_freqs[i] / 1000;
 	}
 
-    lock_policy_rwsem_write(policy->cpu);
-    
     cpufreq_frequency_table_cpuinfo(policy, frequency_table);
 
-    policy->user_policy.min = frequency_table[index_min].frequency;
-    policy->user_policy.max = frequency_table[index_max].frequency;
+    policy->min = policy->user_policy.min = frequency_table[index_min].frequency;
+    policy->max = policy->user_policy.max = frequency_table[index_max].frequency;
 
     *(maximum_thermal) = frequency_table[index_maxthermal].frequency;
     *(maximum_freq) = frequency_table[index_maxfreq].frequency;
-
-    unlock_policy_rwsem_write(policy->cpu);
-
-    cpufreq_cpu_put(policy);
 
     omap_sr_enable(mpu_voltdm, omap_voltage_get_curr_vdata(mpu_voltdm));
 
