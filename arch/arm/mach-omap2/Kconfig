@@ -408,11 +408,17 @@ config OMAP_OVERRIDE_MPUTRIM
 	  Override factory-set trim value for MPU DPLL to allow locking at 
 	  rates >2.4GHz (required for MPU frequencies >1.2GHz).
 
-config OMAP_OC_FREQSLOT
+config OMAP_OCFREQ_1400
 	bool "Enable 1.4GHz MPU frequency slot"
 	depends on OMAP_OVERRIDE_MPUTRIM
 	help
 	  Enable the 1.4GHz MPU frequency slot.
+
+config OMAP_OCFREQ_1600
+	bool "Enable 1.6GHz MPU frequency slot"
+	depends on OMAP_OVERRIDE_MPUTRIM
+	help
+	  Enable the 1.6GHz MPU frequency slot.
 
 endmenu
 
