@@ -217,6 +217,12 @@ static const u8 twl6040_reg_supply[TWL6040_CACHEREGNUM] = {
 	TWL6040_VIO_SUPPLY, /* TWL6040_STATUS (ro)	*/
 };
 
+#ifdef CONFIG_SND_SOC_TWL6040_CONTROL
+static int boosted_volume = 0;
+static int headset_high_power = 0;
+static int headset_power_mode(struct snd_soc_codec *codec, int high_perf);
+#endif
+
 /*
  * read twl6040 register cache
  */
@@ -371,6 +377,10 @@ static inline int twl6040_hs_ramp_step(struct snd_soc_codec *codec,
 
 	if (headset->ramp == TWL6040_RAMP_UP) {
 		/* ramp step up */
+#ifdef CONFIG_SND_SOC_TWL6040_CONTROL
+		headset->left_vol = boosted_volume;
+		headset_power_mode(codec, headset_high_power);
+#endif
 		if (val < headset->left_vol) {
 			if (val + left_step > headset->left_vol)
 				val = headset->left_vol;
@@ -406,6 +416,9 @@ static inline int twl6040_hs_ramp_step(struct snd_soc_codec *codec,
 
 	if (headset->ramp == TWL6040_RAMP_UP) {
 		/* ramp step up */
+#ifdef CONFIG_SND_SOC_TWL6040_CONTROL
+                headset->right_vol = boosted_volume;
+#endif
 		if (val < headset->right_vol) {
 			if (val + right_step > headset->right_vol)
 				val = headset->right_vol;
@@ -920,6 +933,11 @@ static int twl6040_put_volsw(struct snd_kcontrol *kcontrol,
 		out = &twl6040_priv->earphone;
 		break;
 	default:
+#ifdef CONFIG_SND_SOC_TWL6040_CONTROL
+		ucontrol->value.integer.value[0] = boosted_volume;
+		ucontrol->value.integer.value[1] = boosted_volume;
+		printk(KERN_WARNING "twl6040_put_volsw: forcing HS volume\n");
+#endif
 		break;
 	}
 
@@ -984,6 +1002,11 @@ static int twl6040_put_volsw_2r_vu(struct snd_kcontrol *kcontrol,
 		out = &twl6040_priv->handsfree;
 		break;
 	default:
+#ifdef CONFIG_SND_SOC_TWL6040_CONTROL
+                ucontrol->value.integer.value[0] = boosted_volume;
+                ucontrol->value.integer.value[1] = boosted_volume;
+                printk(KERN_WARNING "twl6040_put_volsw_2r_vu: forcing HS volume\n");
+#endif
 		break;
 	}
 
@@ -1673,6 +1696,7 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 	struct twl4030_codec_audio_data *pdata = dev_get_platdata(codec->dev);
 	int ret = 0;
 
+	printk(KERN_WARNING "twl6040_probe\n");
 	priv = kzalloc(sizeof(struct twl6040_data), GFP_KERNEL);
 	if (priv == NULL)
 		return -ENOMEM;
@@ -1760,6 +1784,11 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 	snd_soc_add_controls(codec, twl6040_snd_controls,
 				ARRAY_SIZE(twl6040_snd_controls));
 	twl6040_add_widgets(codec);
+#ifdef CONFIG_SND_SOC_TWL6040_CONTROL
+        ret = headset_power_mode(codec, headset_high_power);
+        if (!ret)
+                priv->headset_mode = 1;
+#endif
 
 	return 0;
 
@@ -1827,17 +1856,82 @@ static struct platform_driver twl6040_codec_driver = {
 	.remove = __devexit_p(twl6040_codec_remove),
 };
 
+#ifndef CONFIG_SND_SOC_TWL6040_CONTROL
 static int __init twl6040_codec_init(void)
 {
 	return platform_driver_register(&twl6040_codec_driver);
 }
 module_init(twl6040_codec_init);
+#endif
 
 static void __exit twl6040_codec_exit(void)
 {
 	platform_driver_unregister(&twl6040_codec_driver);
 }
 module_exit(twl6040_codec_exit);
+
+#ifdef CONFIG_SND_SOC_TWL6040_CONTROL
+static ssize_t high_power_read(struct device * dev, struct device_attribute * attr, char * buf)
+{
+    return sprintf(buf, "%i\n", headset_high_power);
+}
+
+static ssize_t high_power_write(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+    if(sscanf(buf, "%i\n", &headset_high_power) != 1)
+        pr_info("%s: invalid input\n", __FUNCTION__);
+    return size;
+}
+
+
+static ssize_t boostedvolume_read(struct device * dev, struct device_attribute * attr, char * buf)
+{
+    return sprintf(buf, "%i\n", boosted_volume);
+}
+
+static ssize_t boostedvolume_write(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+    int new_volume = 15;
+
+    if(sscanf(buf, "%i\n", &new_volume) == 1)
+	boosted_volume = new_volume;
+    else
+        pr_info("%s: invalid input\n", __FUNCTION__);
+    return size;
+}
+
+static DEVICE_ATTR(boosted_volume, S_IRUGO | S_IWUGO, boostedvolume_read, boostedvolume_write);
+static DEVICE_ATTR(high_power_mode, S_IRUGO | S_IWUGO, high_power_read, high_power_write);
+
+static struct attribute *boosted_volume_attributes[] =
+    {
+        &dev_attr_boosted_volume.attr,
+	&dev_attr_high_power_mode.attr,
+        NULL
+    };
+
+static struct attribute_group boosted_volume_group =
+    {
+        .attrs  = boosted_volume_attributes,
+    };
+
+static struct miscdevice twl6040_device =
+    {
+        .minor = MISC_DYNAMIC_MINOR,
+        .name = "twl6040",
+    };
+
+static int __init twl6040_codec_init(void)
+{
+        misc_register(&twl6040_device);
+	if (sysfs_create_group(&twl6040_device.this_device->kobj, &boosted_volume_group) < 0) {
+            pr_err("%s sysfs_create_group fail\n", __FUNCTION__);
+            pr_err("Failed to create sysfs group for device (%s)!\n", twl6040_device.name);
+        }
+        return platform_driver_register(&twl6040_codec_driver);
+}
+module_init(twl6040_codec_init);
+#endif
 
 MODULE_DESCRIPTION("ASoC TWL6040 codec driver");
 MODULE_AUTHOR("Misael Lopez Cruz");
