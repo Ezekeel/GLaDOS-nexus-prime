@@ -390,12 +390,3 @@ config SND_SOC_WM2000
 
 config SND_SOC_WM9090
 	tristate
-
-config SND_SOC_TWL6040_CONTROL
-	depends on SND_SOC_TWL6040
-	bool "Enable support for tuning the TWL6040"
-	default n
-	help
-	  Enable support for the TWL6040 for tuning the volume
-	  level and enabling/disabling the high performance
-	  (high power) mode using sysfs entries.
