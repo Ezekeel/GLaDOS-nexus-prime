@@ -1849,8 +1849,9 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 		priv->ep_step = 1;
 
 	/* default is low-power mode */
-	priv->headset_mode = 1;
+	priv->headset_mode = 0;
 	priv->sysclk_constraints = &lp_constraints;
+	headset_power_mode(codec, priv->headset_mode);
 	priv->workqueue = create_singlethread_workqueue("twl6040-codec");
 
 	if (!priv->workqueue) {
