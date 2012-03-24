@@ -106,6 +106,14 @@ static struct omap_temp_sensor_regs temp_sensor_context;
 static struct omap_temp_sensor *temp_sensor_pm;
 #endif
 
+#ifdef CONFIG_OMAP_TEMP_CONTROL
+struct omap_temp_sensor * ctrl_sensor;
+
+int temp_limit = BGAP_THRESHOLD_T_HOT;
+
+extern void tempcontrol_registerlimit(int templimit);
+#endif
+
 /*
  * Temperature values in milli degrees celsius ADC code values from 530 to 923
  */
@@ -214,8 +222,13 @@ static void omap_configure_temp_sensor_thresholds(struct omap_temp_sensor
 {
 	u32 temp = 0, t_hot, t_cold, tshut_hot, tshut_cold;
 
+#ifdef CONFIG_OMAP_TEMP_CONTROL
+	t_hot = temp_to_adc_conversion(temp_limit);
+	t_cold = temp_to_adc_conversion(temp_limit - (BGAP_THRESHOLD_T_HOT - BGAP_THRESHOLD_T_COLD));
+#else
 	t_hot = temp_to_adc_conversion(BGAP_THRESHOLD_T_HOT);
 	t_cold = temp_to_adc_conversion(BGAP_THRESHOLD_T_COLD);
+#endif
 
 	if ((t_hot == -EINVAL) || (t_cold == -EINVAL)) {
 		pr_err("%s:Temp thresholds out of bounds\n", __func__);
@@ -234,6 +247,18 @@ static void omap_configure_temp_sensor_thresholds(struct omap_temp_sensor
 			| (tshut_cold << OMAP4_TSHUT_COLD_SHIFT));
 	omap_temp_sensor_writel(temp_sensor, temp, BGAP_TSHUT_OFFSET);
 }
+
+#ifdef CONFIG_OMAP_TEMP_CONTROL
+void tempcontrol_update(int templimit)
+{
+    temp_limit = templimit;
+
+    omap_configure_temp_sensor_thresholds(ctrl_sensor);
+
+    return;
+}
+EXPORT_SYMBOL(tempcontrol_update);
+#endif
 
 static void omap_configure_temp_sensor_counter(struct omap_temp_sensor
 					       *temp_sensor, u32 counter)
@@ -390,7 +415,11 @@ static void throttle_delayed_work_fn(struct work_struct *work)
 					     throttle_work.work);
 	curr = omap_read_current_temp(temp_sensor);
 
+#ifdef CONFIG_OMAP_TEMP_CONTROL
+	if (curr >= temp_limit || curr < 0) {
+#else
 	if (curr >= BGAP_THRESHOLD_T_HOT || curr < 0) {
+#endif
 		pr_warn("%s: OMAP temp read %d exceeds the threshold\n",
 			__func__, curr);
 		omap_thermal_throttle();
@@ -580,6 +609,11 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 	dev_info(dev, "%s probed", pdata->name);
 
 	temp_sensor_pm = temp_sensor;
+
+#ifdef CONFIG_OMAP_TEMP_CONTROL
+	ctrl_sensor = temp_sensor;
+	tempcontrol_registerlimit(temp_limit);
+#endif
 
 	return 0;
 

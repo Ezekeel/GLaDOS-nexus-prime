@@ -582,4 +582,11 @@ source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/carma/Kconfig"
 source "drivers/misc/modem_if/Kconfig"
 
+config OMAP_TEMP_CONTROL
+	bool "Enable support for Temp Control"
+	depends on OMAP_DIE_TEMP_SENSOR
+	default y
+	help
+	  Enable support for Temp Control
+
 endif # MISC_DEVICES
