@@ -103,6 +103,9 @@ static int twl6030_irq_pm_notifier(struct notifier_block *notifier,
 	case PM_SUSPEND_PREPARE:
 		chained_wakeups = atomic_read(&twl6030_wakeirqs);
 
+		/* Infrequent enough to not burden kmsg. */
+		pr_info("%s(): wakeirqs=%d irq_wake_enabled=%d\n", __func__,
+			chained_wakeups, twl_irq_wake_enabled);
 		if (chained_wakeups && !twl_irq_wake_enabled) {
 			if (enable_irq_wake(twl_irq))
 				pr_err("twl6030 IRQ wake enable failed\n");
@@ -192,8 +195,17 @@ static int twl6030_irq_thread(void *data)
 			}
 		local_irq_enable();
 		}
-		ret = twl_i2c_write(TWL_MODULE_PIH, sts.bytes,
-				REG_INT_STS_A, 3); /* clear INT_STS_A */
+
+		/*
+		 * NOTE:
+		 * Simulation confirms that documentation is wrong w.r.t the
+		 * interrupt status clear operation. A single *byte* write to
+		 * any one of STS_A to STS_C register results in all three
+		 * STS registers being reset. Since it does not matter which
+		 * value is written, all three registers are cleared on a
+		 * single byte write, so we just use 0x0 to clear.
+		 */
+		ret = twl_i2c_write_u8(TWL_MODULE_PIH, 0x00, REG_INT_STS_A);
 		if (ret)
 			pr_warning("twl6030: I2C error in clearing PIH ISR\n");
 
