@@ -631,4 +631,10 @@ config VIBRATOR_CONTROL
 	help
 	  Say Y here to enable Vibrator Control
 
+config FSYNC_CONTROL
+        bool "Support for FSync Control"
+        default y
+        help
+          Say Y here to enable FSync Control
+
 endif # MISC_DEVICES
