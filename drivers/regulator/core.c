@@ -28,6 +28,10 @@
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 
+#ifdef CONFIG_CUSTOM_VOLTAGE
+#include <linux/custom_voltage.h>
+#endif
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/regulator.h>
 
@@ -2955,6 +2959,12 @@ unlock:
 	}
 
 	mutex_unlock(&regulator_list_mutex);
+
+#ifdef CONFIG_CUSTOM_VOLTAGE
+	customvoltage_register_regulatormutex(&regulator_list_mutex);
+	customvoltage_register_regulators(&regulator_list);
+	customvoltage_init();
+#endif
 
 	return 0;
 }

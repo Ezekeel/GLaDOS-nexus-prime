@@ -32,10 +32,6 @@
 #include <linux/live_oc.h>
 #endif
 
-#ifdef CONFIG_CUSTOM_VOLTAGE
-#include <linux/custom_voltage.h>
-#endif
-
 /*
  * Structures containing OMAP4430 voltage supported and various
  * voltage dependent data for each VDD.
@@ -369,10 +365,6 @@ int __init omap4_opp_init(void)
 
 #ifdef CONFIG_LIVE_OC
 	liveoc_init();
-#endif
-
-#ifdef CONFIG_CUSTOM_VOLTAGE
-	customvoltage_init();
 #endif
 
 	return r;
