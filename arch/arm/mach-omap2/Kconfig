@@ -420,6 +420,12 @@ config OMAP_OVERRIDE_MPUTRIM
 	  Override factory-set trim value for MPU DPLL to allow locking at 
 	  rates >2.4GHz (required for MPU frequencies >1.2GHz).
 
+config OMAP_REGULATOR_VOLTCHANGE
+	bool "Allow voltage changes for regulators"
+	default n
+	help
+	  Allow voltage changes for regulators.
+
 endmenu
 
 config FORCE_FAST_CHARGE
