@@ -13,11 +13,14 @@
 #include <linux/opp.h>
 #include <linux/slab.h>
 #include <linux/plist.h>
+#include <linux/regulator/consumer.h>
+#include <linux/regulator/driver.h>
+#include <linux/regulator/machine.h>
 
 #include "../../arch/arm/mach-omap2/voltage.h"
 #include "../../arch/arm/mach-omap2/smartreflex.h"
 
-#define CUSTOMVOLTAGE_VERSION 2
+#define CUSTOMVOLTAGE_VERSION 3
 
 struct opp {
     struct list_head node;
@@ -26,7 +29,7 @@ struct opp {
     unsigned long rate;
     unsigned long u_volt;
     
-    struct device_opp *dev_opp;
+    struct device_opp * dev_opp;
 };
 
 struct device_opp {
@@ -50,10 +53,22 @@ struct omap_vdd_dvfs_info {
     struct list_head dev_list;
 };
 
-static int num_mpuvolt, num_corevolt, num_ivavolt, num_mpudeps, num_ivadeps;
+struct regulator {
+    struct device * dev;
+    struct list_head list;
+    int uA_load;
+    int min_uV;
+    int max_uV;
+    char * supply_name;
+    struct device_attribute dev_attr;
+    struct regulator_dev * rdev;
+};
+
+static int num_mpuvolt, num_corevolt, num_ivavolt, num_mpudeps, num_ivadeps, num_regulatorvolt;
 
 static struct mutex * frequency_mutex = NULL;
 static struct mutex * dvfs_mutex = NULL;
+static struct mutex * regulator_mutex = NULL;
 
 static int num_mpufreqs;
 
@@ -117,8 +132,27 @@ static int * ivacore_depindex = NULL;
 
 static unsigned long * new_voltages = NULL;
 
+static struct list_head * regulator_list = NULL;
+
+static struct regulator_dev ** regulators = NULL;
+
 extern struct device_opp * find_device_opp(struct device * dev);
 extern struct omap_vdd_dvfs_info * _voltdm_to_dvfs_info(struct voltagedomain * voltdm);
+
+void customvoltage_register_regulatormutex(struct mutex * regulatormutex)
+{
+    regulator_mutex = regulatormutex;
+
+    return;
+}
+
+void customvoltage_register_regulators(struct list_head * reg_list)
+{
+    regulator_list = reg_list;
+
+    return;
+}
+EXPORT_SYMBOL(customvoltage_register_regulators);
 
 void customvoltage_register_freqmutex(struct mutex * freqmutex)
 {
@@ -194,6 +228,8 @@ void customvoltage_init(void)
     struct omap_volt_data * volt_data;
 
     unsigned long voltage;
+
+    struct regulator_dev * rdev;
 
     // MPU voltage domain
     mpu_voltdm = voltdm_lookup("mpu");
@@ -580,7 +616,37 @@ void customvoltage_init(void)
 		}
 	}
 
-    new_voltages = kzalloc(max(max(num_ivavolt, num_corevolt), num_mpuvolt) * sizeof(int), GFP_KERNEL);
+
+    // Regulators
+    mutex_lock(regulator_mutex);
+
+    num_regulatorvolt = 0;
+
+    list_for_each_entry(rdev, regulator_list, list) 
+	{
+	    if (rdev->desc->type == REGULATOR_VOLTAGE && rdev->constraints && (rdev->constraints->valid_ops_mask & REGULATOR_CHANGE_VOLTAGE)
+		&& rdev->constraints->min_uV > 0 && rdev->constraints->min_uV == rdev->constraints->max_uV)
+		num_regulatorvolt++;
+
+	}
+
+    regulators = kzalloc(num_regulatorvolt * sizeof(struct regulator *), GFP_KERNEL);
+
+    i = 0;
+
+    list_for_each_entry(rdev, regulator_list, list) 
+	{
+	    if (rdev->desc->type == REGULATOR_VOLTAGE && rdev->constraints && (rdev->constraints->valid_ops_mask & REGULATOR_CHANGE_VOLTAGE)
+		&& rdev->constraints->min_uV > 0 && rdev->constraints->min_uV == rdev->constraints->max_uV) {
+		regulators[i] = rdev;
+
+		i++;
+	    }
+	}
+
+    mutex_unlock(regulator_mutex);
+
+    new_voltages = kzalloc(max(max(max(num_ivavolt, num_corevolt), num_mpuvolt), num_regulatorvolt) * sizeof(int), GFP_KERNEL);
 
     return;
 }
@@ -917,6 +983,87 @@ static ssize_t customvoltage_ivavolt_write(struct device * dev, struct device_at
     return size;
 }
 
+static ssize_t customvoltage_regulatorvolt_read(struct device * dev, struct device_attribute * attr, char * buf)
+{
+    int i, j = 0;
+
+    for (i = 0; i < num_regulatorvolt; i++)
+	{
+	    j += sprintf(&buf[j], "%s: %lu mV\n", regulators[i]->desc->name, (long unsigned)(regulators[i]->constraints->min_uV / 1000));
+	}
+
+    return j;
+}
+
+static void customvoltage_regulatorvolt_update(void)
+{
+    struct regulator * reg;
+
+    int i;
+
+    mutex_lock(regulator_mutex);
+
+    for (i = 0; i < num_regulatorvolt; i++)
+	{
+	    mutex_lock(&regulators[i]->mutex);
+
+	    regulators[i]->constraints->min_uV = regulators[i]->constraints->max_uV = new_voltages[i];
+
+	    mutex_unlock(&regulators[i]->mutex);
+
+	    list_for_each_entry(reg, &regulators[i]->consumer_list, list)
+		{
+		    regulator_set_voltage(reg, new_voltages[i], new_voltages[i]);
+		}
+	}
+
+    mutex_unlock(regulator_mutex);
+
+    return;
+}
+
+static ssize_t customvoltage_regulatorvolt_write(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
+{
+    int i = 0, j = 0, next_volt = 0;
+    unsigned long voltage;
+
+    char buffer[20];
+
+    while (1)
+	{
+	    buffer[j] = buf[i];
+
+	    i++;
+	    j++;
+
+	    if (buf[i] == ' ' || buf[i] == '\0')
+		{
+		    buffer[j] = '\0';
+
+		    if (sscanf(buffer, "%lu", &voltage) == 1)
+			{
+			    new_voltages[next_volt] = voltage * 1000;
+		
+			    next_volt++;
+			}
+
+		    if (buf[i] == '\0' || next_volt >= num_regulatorvolt)
+			{
+			    break;
+			}
+
+		    j = 0;
+		}
+	}
+
+    for (i = next_volt; i < num_regulatorvolt; i++)
+	new_voltages[i] = regulators[i]->constraints->min_uV;
+
+    customvoltage_regulatorvolt_update();
+
+    return size;
+}
+
 static ssize_t customvoltage_version(struct device * dev, struct device_attribute * attr, char * buf)
 {
     return sprintf(buf, "%u\n", CUSTOMVOLTAGE_VERSION);
@@ -925,6 +1072,7 @@ static ssize_t customvoltage_version(struct device * dev, struct device_attribut
 static DEVICE_ATTR(mpu_voltages, S_IRUGO | S_IWUGO, customvoltage_mpuvolt_read, customvoltage_mpuvolt_write);
 static DEVICE_ATTR(core_voltages, S_IRUGO | S_IWUGO, customvoltage_corevolt_read, customvoltage_corevolt_write);
 static DEVICE_ATTR(iva_voltages, S_IRUGO | S_IWUGO, customvoltage_ivavolt_read, customvoltage_ivavolt_write);
+static DEVICE_ATTR(regulator_voltages, S_IRUGO | S_IWUGO, customvoltage_regulatorvolt_read, customvoltage_regulatorvolt_write);
 static DEVICE_ATTR(version, S_IRUGO , customvoltage_version, NULL);
 
 static struct attribute *customvoltage_attributes[] = 
@@ -932,6 +1080,7 @@ static struct attribute *customvoltage_attributes[] =
 	&dev_attr_mpu_voltages.attr,
 	&dev_attr_core_voltages.attr,
 	&dev_attr_iva_voltages.attr,
+	&dev_attr_regulator_voltages.attr,
 	&dev_attr_version.attr,
 	NULL
     };
