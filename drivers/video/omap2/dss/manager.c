@@ -384,6 +384,40 @@ static ssize_t manager_cpr_coef_store(struct omap_overlay_manager *mgr,
 	return size;
 }
 
+#ifdef CONFIG_OMAP2_DSS_GAMMA_CONTROL
+static ssize_t manager_gamma_show(
+		struct omap_overlay_manager *mgr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", mgr->info.gamma);
+}
+
+static ssize_t manager_gamma_store(
+		struct omap_overlay_manager *mgr,
+		const char *buf, size_t size)
+{
+	struct omap_overlay_manager_info info;
+	int gamma_value;
+	int r;
+
+	if (sscanf(buf, "%d", &gamma_value) != 1)
+		return -EINVAL;
+
+	mgr->get_manager_info(mgr, &info);
+
+	info.gamma = gamma_value;
+
+	r = mgr->set_manager_info(mgr, &info);
+	if (r)
+		return r;
+
+	r = mgr->apply(mgr);
+	if (r)
+		return r;
+
+	return size;
+}
+#endif
+
 struct manager_attribute {
 	struct attribute attr;
 	ssize_t (*show)(struct omap_overlay_manager *, char *);
@@ -415,7 +449,11 @@ static MANAGER_ATTR(cpr_enable, S_IRUGO|S_IWUSR,
 static MANAGER_ATTR(cpr_coef, S_IRUGO|S_IWUSR,
 		manager_cpr_coef_show,
 		manager_cpr_coef_store);
-
+#ifdef CONFIG_OMAP2_DSS_GAMMA_CONTROL
+static MANAGER_ATTR(gamma, S_IRUGO|S_IWUSR,
+			manager_gamma_show,
+			manager_gamma_store);
+#endif
 
 static struct attribute *manager_sysfs_attrs[] = {
 	&manager_attr_name.attr,
@@ -427,6 +465,9 @@ static struct attribute *manager_sysfs_attrs[] = {
 	&manager_attr_alpha_blending_enabled.attr,
 	&manager_attr_cpr_enable.attr,
 	&manager_attr_cpr_coef.attr,
+#ifdef CONFIG_OMAP2_DSS_GAMMA_CONTROL
+	&manager_attr_gamma.attr,
+#endif
 	NULL
 };
 
@@ -570,6 +611,9 @@ struct manager_cache_data {
 
 	enum omap_dss_trans_key_type trans_key_type;
 	u32 trans_key;
+#ifdef CONFIG_OMAP2_DSS_GAMMA_CONTROL
+	u8 gamma;
+#endif
 	bool trans_enabled;
 
 	bool alpha_enabled;
@@ -1104,6 +1148,9 @@ static void configure_manager(enum omap_channel channel)
 	dispc_set_default_color(channel, c->default_color);
 	dispc_set_trans_key(channel, c->trans_key_type, c->trans_key);
 	dispc_enable_trans_key(channel, c->trans_enabled);
+#ifdef CONFIG_OMAP2_DSS_GAMMA_CONTROL
+	dispc_enable_gamma(channel, c->gamma);
+#endif
 
 	/* if we have OMAP3 alpha compatibility, alpha blending is always on */
 	if (dss_has_feature(FEAT_ALPHA_OMAP3_COMPAT)) {
@@ -1848,6 +1895,9 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	mc->alpha_enabled = mgr->info.alpha_enabled;
 	mc->cpr_coefs = mgr->info.cpr_coefs;
 	mc->cpr_enable = mgr->info.cpr_enable;
+#ifdef CONFIG_OMAP2_DSS_GAMMA_CONTROL
+	mc->gamma = mgr->info.gamma;
+#endif
 
 	mc->manual_upd_display =
 		dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE;
