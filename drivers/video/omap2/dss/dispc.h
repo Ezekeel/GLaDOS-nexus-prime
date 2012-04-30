@@ -35,6 +35,9 @@
 #define DISPC_GLOBAL_ALPHA		0x0074
 #define DISPC_CONTROL2			0x0238
 #define DISPC_CONFIG2			0x0620
+#ifdef CONFIG_OMAP2_DSS_GAMMA_CONTROL
+#define DISPC_GAMMA_TABLE		0x0630
+#endif
 #define DISPC_DIVISOR			0x0804
 
 /* DISPC overlay registers */
