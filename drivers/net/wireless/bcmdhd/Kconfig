@@ -31,3 +31,11 @@ config BCMDHD_WEXT
 	select WEXT_PRIV
 	help
 	  Enables WEXT support
+
+config BCMDHD_WIFI_PM
+	bool "Enable support for changing the WiFi power mode"
+	depends on BCMDHD
+	default n
+	help
+	  Enable support for changing the WiFi power mode for
+	  screen-off.
