@@ -39,6 +39,25 @@ static struct omap_device_pm_latency omap_sr_latency[] = {
 	},
 };
 
+#ifdef CONFIG_OMAP_SMARTREFLEX_CUSTOM_SENSOR
+#define GAIN_MAXLIMIT 16
+#define R_MAXLIMIT 256
+
+static void cal_reciprocal(u32 sensor, u32 *sengain, u32 *rnsen)
+{
+	u32 gn, rn, mul;
+
+	for (gn = 0; gn < GAIN_MAXLIMIT; gn++) {
+		mul = 1 << (gn + 8);
+		rn = mul / sensor;
+		if (rn < R_MAXLIMIT) {
+			*sengain = gn;
+			*rnsen = rn;
+		}
+	}
+}
+#endif
+
 /* Read EFUSE values from control registers for OMAP3430 */
 static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
 				struct omap_sr_data *sr_data)
@@ -62,9 +81,27 @@ static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
 		if (cpu_is_omap44xx()) {
 			u16 offset = volt_data[i].sr_efuse_offs;
 
-			v = omap_ctrl_readb(offset) |
+#ifdef CONFIG_OMAP_SMARTREFLEX_CUSTOM_SENSOR
+			if (offset == 0) {
+			    u32 pgain = 0, pvalue = 0, ngain = 0, nvalue = 0;
+
+			    cal_reciprocal(volt_data[i].sr_nsensor, &ngain, &nvalue);
+			    cal_reciprocal(volt_data[i].sr_psensor, &pgain, &pvalue);
+
+			    v = (pgain << NVALUERECIPROCAL_SENPGAIN_SHIFT) |
+				(ngain << NVALUERECIPROCAL_SENNGAIN_SHIFT) |
+				(pvalue << NVALUERECIPROCAL_RNSENP_SHIFT) |
+				(nvalue);
+			} else {
+			    v = omap_ctrl_readb(offset) |
 				omap_ctrl_readb(offset + 1) << 8 |
 				omap_ctrl_readb(offset + 2) << 16;
+			}
+#else
+			v = omap_ctrl_readb(offset) |
+				omap_ctrl_readb(offset + 1) << 8 |
+				omap_ctrl_readb(offset + 2) << 16;			
+#endif			
 		} else {
 			 v = omap_ctrl_readl(volt_data[i].sr_efuse_offs);
 		}
