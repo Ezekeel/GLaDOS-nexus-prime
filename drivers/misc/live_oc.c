@@ -39,6 +39,8 @@
 #define SUSPEND_DELAY 200
 #define COREUPDATE_DELAY 5000
 
+#define MAX_MPU_FREQ 2147446153
+
 static bool device_suspended, screen_on;
 
 static struct wake_lock liveoc_wake_lock;
@@ -306,11 +308,18 @@ static void liveoc_mpu_update(void)
 
 	    new_freq = (original_mpu_freqs[i] / 100) * mpu_ocvalue;
 
+	    if (new_freq > MAX_MPU_FREQ)
+		new_freq = MAX_MPU_FREQ;
+
 	    rounded_freq = dpll_mpu_clock->round_rate(dpll_mpu_clock, new_freq);
 
 	    while (rounded_freq <= 0)
 		{
 		    new_freq += FREQ_INCREASE_STEP;
+
+		    if (new_freq > MAX_MPU_FREQ)
+			new_freq = MAX_MPU_FREQ;
+    
 		    rounded_freq = dpll_mpu_clock->round_rate(dpll_mpu_clock, new_freq);
 		}
 
