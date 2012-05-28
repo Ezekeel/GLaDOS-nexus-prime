@@ -73,6 +73,7 @@ static struct mutex * regulator_mutex = NULL;
 static int num_mpufreqs;
 
 static u32 ** mpu_voltages = NULL;
+static u32 ** mpu_voltages_calibrated = NULL;
 
 static struct device * mpu_device = NULL;
 
@@ -86,6 +87,7 @@ static struct opp ** mpu_opp = NULL;
 static int num_gpufreqs, num_l3freqs, num_fdiffreqs, num_hsifreqs;
 
 static u32 ** core_voltages = NULL;
+static u32 ** core_voltages_calibrated = NULL;
 
 static struct device * gpu_device = NULL;
 static struct device * l3_device = NULL;
@@ -108,6 +110,7 @@ static struct opp ** hsi_opp = NULL;
 static int num_ivafreqs, num_dspfreqs, num_aessfreqs;
 
 static u32 ** iva_voltages = NULL;
+static u32 ** iva_voltages_calibrated = NULL;
 
 static struct device * iva_device = NULL;
 static struct device * dsp_device = NULL;
@@ -247,10 +250,12 @@ void customvoltage_init(void)
 	}
 
     mpu_voltages = kzalloc(num_mpuvolt * sizeof(u32 *), GFP_KERNEL);
+    mpu_voltages_calibrated = kzalloc(num_mpuvolt * sizeof(u32 *), GFP_KERNEL);
 
     for (i = 0; i < num_mpuvolt; i++)
 	{
 	    mpu_voltages[i] = &(mpu_voltdm->vdd->volt_data[i].volt_nominal);
+	    mpu_voltages_calibrated[i] = &(mpu_voltdm->vdd->volt_data[i].volt_calibrated);
 	}
 
     dev_opp = find_device_opp(mpu_device);
@@ -306,10 +311,12 @@ void customvoltage_init(void)
 	}
 
     core_voltages = kzalloc(num_corevolt * sizeof(u32 *), GFP_KERNEL);
+    core_voltages_calibrated = kzalloc(num_corevolt * sizeof(u32 *), GFP_KERNEL);
 
     for (i = 0; i < num_corevolt; i++)
 	{
 	    core_voltages[i] = &(core_voltdm->vdd->volt_data[i].volt_nominal);
+	    core_voltages_calibrated[i] = &(core_voltdm->vdd->volt_data[i].volt_calibrated);
 	}
 
     dev_opp = find_device_opp(gpu_device);
@@ -458,10 +465,12 @@ void customvoltage_init(void)
 	}
 
     iva_voltages = kzalloc(num_ivavolt * sizeof(u32 *), GFP_KERNEL);
+    iva_voltages_calibrated = kzalloc(num_ivavolt * sizeof(u32 *), GFP_KERNEL);
 
     for (i = 0; i < num_ivavolt; i++)
 	{
 	    iva_voltages[i] = &(iva_voltdm->vdd->volt_data[i].volt_nominal);
+	    iva_voltages_calibrated[i] = &(iva_voltdm->vdd->volt_data[i].volt_calibrated);
 	}
 
     dev_opp = find_device_opp(iva_device);
@@ -665,6 +674,18 @@ ssize_t customvoltage_mpuvolt_read(struct device * dev, struct device_attribute 
 }
 EXPORT_SYMBOL(customvoltage_mpuvolt_read);
 
+static ssize_t customvoltage_mpuvolt_calibrated_read(struct device * dev, struct device_attribute * attr, char * buf)
+{
+    int i, j = 0;
+
+    for (i = num_mpufreqs - 1; i >= 0; i--)
+	{
+	    j += sprintf(&buf[j], "%lumhz: %lu mV\n", mpu_opp[i]->rate / 1000000, (long unsigned)(*mpu_voltages_calibrated[i] / 1000));
+	}
+
+    return j;
+}
+
 static void customvoltage_mpuvolt_update(void)
 {
     int i, j;
@@ -693,6 +714,7 @@ static void customvoltage_mpuvolt_update(void)
 	{
 	    mpu_voltdm->vdd->volt_data[i].volt_nominal = new_voltages[i];
 	    mpu_voltdm->vdd->volt_data[i].volt_calibrated = 0;
+	    mpu_voltdm->vdd->volt_data[i].volt_dynamic_nominal = 0;
 
 	    for (j = 0; j < num_mpufreqs; j++)
 		if (mpu_depend[j] == i)
@@ -768,6 +790,18 @@ static ssize_t customvoltage_corevolt_read(struct device * dev, struct device_at
     return j;
 }
 
+static ssize_t customvoltage_corevolt_calibrated_read(struct device * dev, struct device_attribute * attr, char * buf)
+{
+    int i, j = 0;
+
+    for (i = num_corevolt - 1; i >= 0; i--)
+	{
+	    j += sprintf(&buf[j], "%lu mV\n", (long unsigned)(*core_voltages_calibrated[i] / 1000));
+	}
+
+    return j;
+}
+
 static void customvoltage_corevolt_update(void)
 {
     int i, j;
@@ -796,6 +830,7 @@ static void customvoltage_corevolt_update(void)
 	{
 	    core_voltdm->vdd->volt_data[i].volt_nominal = new_voltages[i];
 	    core_voltdm->vdd->volt_data[i].volt_calibrated = 0;
+	    core_voltdm->vdd->volt_data[i].volt_dynamic_nominal = 0;
 
 	    for (j = 0; j < num_gpufreqs; j++)
 		if (gpu_depend[j] == i)
@@ -885,6 +920,18 @@ static ssize_t customvoltage_ivavolt_read(struct device * dev, struct device_att
     return j;
 }
 
+static ssize_t customvoltage_ivavolt_calibrated_read(struct device * dev, struct device_attribute * attr, char * buf)
+{
+    int i, j = 0;
+
+    for (i = num_ivavolt - 1; i >= 0; i--)
+	{
+	    j += sprintf(&buf[j], "%lu mV\n", (long unsigned)(*iva_voltages_calibrated[i] / 1000));
+	}
+
+    return j;
+}
+
 static void customvoltage_ivavolt_update(void)
 {
     int i, j;
@@ -913,6 +960,7 @@ static void customvoltage_ivavolt_update(void)
 	{
 	    iva_voltdm->vdd->volt_data[i].volt_nominal = new_voltages[i];
 	    iva_voltdm->vdd->volt_data[i].volt_calibrated = 0;
+	    iva_voltdm->vdd->volt_data[i].volt_dynamic_nominal = 0;
 
 	    for (j = 0; j < num_ivafreqs; j++)
 		if (iva_depend[j] == i)
@@ -1073,6 +1121,9 @@ static DEVICE_ATTR(mpu_voltages, S_IRUGO | S_IWUGO, customvoltage_mpuvolt_read, 
 static DEVICE_ATTR(core_voltages, S_IRUGO | S_IWUGO, customvoltage_corevolt_read, customvoltage_corevolt_write);
 static DEVICE_ATTR(iva_voltages, S_IRUGO | S_IWUGO, customvoltage_ivavolt_read, customvoltage_ivavolt_write);
 static DEVICE_ATTR(regulator_voltages, S_IRUGO | S_IWUGO, customvoltage_regulatorvolt_read, customvoltage_regulatorvolt_write);
+static DEVICE_ATTR(mpu_voltages_calibrated, S_IRUGO, customvoltage_mpuvolt_calibrated_read, NULL);
+static DEVICE_ATTR(core_voltages_calibrated, S_IRUGO, customvoltage_corevolt_calibrated_read, NULL);
+static DEVICE_ATTR(iva_voltages_calibrated, S_IRUGO, customvoltage_ivavolt_calibrated_read, NULL);
 static DEVICE_ATTR(version, S_IRUGO , customvoltage_version, NULL);
 
 static struct attribute *customvoltage_attributes[] = 
@@ -1081,6 +1132,9 @@ static struct attribute *customvoltage_attributes[] =
 	&dev_attr_core_voltages.attr,
 	&dev_attr_iva_voltages.attr,
 	&dev_attr_regulator_voltages.attr,
+	&dev_attr_mpu_voltages_calibrated.attr,
+	&dev_attr_core_voltages_calibrated.attr,
+	&dev_attr_iva_voltages_calibrated.attr,
 	&dev_attr_version.attr,
 	NULL
     };
