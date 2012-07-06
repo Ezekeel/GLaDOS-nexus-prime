@@ -42,6 +42,10 @@
 #include "sgxinfokm.h"
 #include "syslocal.h"
 
+#ifdef CONFIG_LIVE_OC
+#include <linux/live_oc.h>
+#emdif
+
 #if !defined(PVR_LINUX_USING_WORKQUEUES)
 #error "PVR_LINUX_USING_WORKQUEUES must be defined"
 #endif
@@ -90,12 +94,20 @@ static inline IMG_UINT32 scale_by_rate(IMG_UINT32 val, IMG_UINT32 rate1, IMG_UIN
 
 static inline IMG_UINT32 scale_prop_to_SGX_clock(IMG_UINT32 val, IMG_UINT32 rate)
 {
+#ifdef CONFIG_LIVE_OC
+	return scale_by_rate(val, rate, liveoc_gpu_freq());
+#else
 	return scale_by_rate(val, rate, SYS_SGX_CLOCK_SPEED);
+#endif
 }
 
 static inline IMG_UINT32 scale_inv_prop_to_SGX_clock(IMG_UINT32 val, IMG_UINT32 rate)
 {
+#ifdef CONFIG_LIVE_OC
+    	return scale_by_rate(val, liveoc_gpu_freq(), rate);
+#else
 	return scale_by_rate(val, SYS_SGX_CLOCK_SPEED, rate);
+#endif
 }
 
 IMG_VOID SysGetSGXTimingInformation(SGX_TIMING_INFORMATION *psTimingInfo)
@@ -103,11 +115,19 @@ IMG_VOID SysGetSGXTimingInformation(SGX_TIMING_INFORMATION *psTimingInfo)
 	IMG_UINT32 rate;
 
 #if defined(NO_HARDWARE)
+#ifdef CONFIG_LIVE_OC
+	rate = liveoc_gpu_freq();
+#else
 	rate = SYS_SGX_CLOCK_SPEED;
+#endif
 #else
 	PVR_ASSERT(atomic_read(&gpsSysSpecificData->sSGXClocksEnabled) != 0);
 
-       rate = SYS_SGX_CLOCK_SPEED;
+#ifdef CONFIG_LIVE_OC
+	rate = liveoc_gpu_freq();
+#else
+	rate = SYS_SGX_CLOCK_SPEED;
+#endif
 	PVR_ASSERT(rate != 0);
 #endif
 	psTimingInfo->ui32CoreClockSpeed = rate;

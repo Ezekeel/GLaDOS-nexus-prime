@@ -42,6 +42,10 @@
 
 #include "dvfs.h"
 
+#ifdef CONFIG_LIVE_OC
+#include <linux/live_oc.h>
+#endif
+
 #ifdef CONFIG_SMP
 struct lpj_info {
 	unsigned long	ref;
@@ -235,6 +239,10 @@ static int omap_target(struct cpufreq_policy *policy,
 	unsigned int i;
 	int ret = 0;
 
+#ifdef CONFIG_LIVE_OC
+	mutex_lock(&omap_cpufreq_lock);
+#endif
+
 	if (!freq_table) {
 		dev_err(mpu_dev, "%s: cpu%d: no freq table!\n", __func__,
 				policy->cpu);
@@ -249,7 +257,9 @@ static int omap_target(struct cpufreq_policy *policy,
 		return ret;
 	}
 
+#ifndef CONFIG_LIVE_OC
 	mutex_lock(&omap_cpufreq_lock);
+#endif
 
 	current_target_freq = freq_table[i].frequency;
 
@@ -361,6 +371,13 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
 
 	/* FIXME: what's the actual transition time? */
 	policy->cpuinfo.transition_latency = 300 * 1000;
+
+#ifdef CONFIG_LIVE_OC
+	liveoc_register_maxthermal(&max_thermal);
+	liveoc_register_maxfreq(&max_freq);
+	liveoc_register_freqtable(freq_table);
+	liveoc_register_freqmutex(&omap_cpufreq_lock);
+#endif
 
 	return 0;
 
