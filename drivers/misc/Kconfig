@@ -579,4 +579,10 @@ source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/carma/Kconfig"
 source "drivers/misc/modem_if/Kconfig"
 
+config SOUND_CONTROL
+	bool "Enable support for Sound Control"
+	default y
+	help
+	  Enable support for Sound Control
+
 endif # MISC_DEVICES
