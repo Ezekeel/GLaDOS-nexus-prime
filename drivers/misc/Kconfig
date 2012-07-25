@@ -597,4 +597,10 @@ config CUSTOM_VOLTAGE
 	help
 	  Say Y here to enable Custom Voltage
 
+config FSYNC_CONTROL
+        bool "Support for FSync Control"
+        default y
+        help
+          Say Y here to enable FSync Control
+
 endif # MISC_DEVICES
