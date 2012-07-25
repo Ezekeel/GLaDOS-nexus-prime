@@ -500,6 +500,9 @@ static struct regulator_init_data tuna_vaux1 = {
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask	 =	REGULATOR_CHANGE_MODE
+#ifdef CONFIG_OMAP_REGULATOR_VOLTCHANGE
+					| REGULATOR_CHANGE_VOLTAGE
+#endif
 					| REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
 	},
@@ -588,6 +591,9 @@ static struct regulator_init_data tuna_vusim = {
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask	 	= REGULATOR_CHANGE_MODE
+#ifdef CONFIG_OMAP_REGULATOR_VOLTCHANGE
+					| REGULATOR_CHANGE_VOLTAGE
+#endif
 					| REGULATOR_CHANGE_STATUS,
 	},
 	.num_consumer_supplies = ARRAY_SIZE(tuna_vusim_supplies),
@@ -601,6 +607,9 @@ static struct regulator_init_data tuna_vana = {
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
+#ifdef CONFIG_OMAP_REGULATOR_VOLTCHANGE
+					| REGULATOR_CHANGE_VOLTAGE
+#endif
 					| REGULATOR_CHANGE_STATUS,
 		.always_on	= true,
 	},
@@ -618,6 +627,9 @@ static struct regulator_init_data tuna_vcxio = {
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+#ifdef CONFIG_OMAP_REGULATOR_VOLTCHANGE
+					| REGULATOR_CHANGE_VOLTAGE
+#endif
 					| REGULATOR_CHANGE_STATUS,
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(tuna_vcxio_supply),
@@ -638,6 +650,9 @@ static struct regulator_init_data tuna_vdac = {
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
+#ifdef CONFIG_OMAP_REGULATOR_VOLTCHANGE
+					| REGULATOR_CHANGE_VOLTAGE
+#endif
 					| REGULATOR_CHANGE_STATUS,
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(tuna_vdac_supply),
@@ -655,6 +670,9 @@ static struct regulator_init_data tuna_vusb = {
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask	 =	REGULATOR_CHANGE_MODE
+#ifdef CONFIG_OMAP_REGULATOR_VOLTCHANGE
+					| REGULATOR_CHANGE_VOLTAGE
+#endif
 					| REGULATOR_CHANGE_STATUS,
 		.state_mem = {
 			.disabled	= true,
@@ -723,6 +741,9 @@ static struct regulator_init_data tuna_v2v1 = {
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+#ifdef CONFIG_OMAP_REGULATOR_VOLTCHANGE
+					| REGULATOR_CHANGE_VOLTAGE
+#endif
 					| REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
 	},

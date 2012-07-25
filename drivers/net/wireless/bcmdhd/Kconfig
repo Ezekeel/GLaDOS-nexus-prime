@@ -52,3 +52,11 @@ config DHD_ENABLE_P2P
 	default n
 	---help---
 	  Use Enable Wifi Direct
+
+config BCMDHD_WIFI_PM
+	bool "Enable support for changing the WiFi power mode"
+	depends on BCMDHD
+	default n
+	help
+	  Enable support for changing the WiFi power mode for
+	  screen-off.

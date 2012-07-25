@@ -155,6 +155,10 @@ struct omap_volt_data {
 	u32	volt_dynamic_nominal;
 	u32	volt_margin;
 	u32	sr_efuse_offs;
+#ifdef CONFIG_OMAP_SMARTREFLEX_CUSTOM_SENSOR
+	u32	sr_nsensor;
+	u32	sr_psensor;
+#endif
 	u8	sr_errminlimit;
 	u8	vp_errgain;
 	int	abb_type;
