@@ -30,6 +30,10 @@
 
 #include "voltage.h"
 
+#ifdef CONFIG_LIVE_OC
+#include <linux/live_oc.h>
+#endif
+
 /* Utility macro for masking and setting a field in a register/variable */
 #define mask_n_set(reg, shift, msk, val) \
 	(reg) = (((reg) & ~(msk))|(((val) << (shift)) & msk))
@@ -187,13 +191,21 @@ static const struct lpddr2_timings *get_timings_table(
 	u32 i, temp, freq_nearest;
 	const struct lpddr2_timings *timings = NULL;
 
+#ifdef CONFIG_LIVE_OC
+	emif_assert(freq <= (MAX_LPDDR2_FREQ / 100) * liveoc_core_ocvalue());
+#else
 	emif_assert(freq <= MAX_LPDDR2_FREQ);
+#endif
 	emif_assert(device_timings);
 
 	/*
 	 * Start with the maximum allowed frequency - that is always safe
 	 */
+#ifdef CONFIG_LIVE_OC
+	freq_nearest = (MAX_LPDDR2_FREQ / 100) * liveoc_core_ocvalue();
+#else
 	freq_nearest = MAX_LPDDR2_FREQ;
+#endif
 	/*
 	 * Find the timings table that has the max frequency value:
 	 *   i.  Above or equal to the DDR frequency - safe
@@ -201,7 +213,11 @@ static const struct lpddr2_timings *get_timings_table(
 	 */
 	for (i = 0; i < MAX_NUM_SPEEDBINS; i++) {
 		if (device_timings[i]) {
+#ifdef CONFIG_LIVE_OC
+			temp = (device_timings[i]->max_freq / 100) * liveoc_core_ocvalue();
+#else
 			temp = device_timings[i]->max_freq;
+#endif
 			if ((temp >= freq) && (temp <= freq_nearest)) {
 				freq_nearest = temp;
 				timings = device_timings[i];
@@ -963,7 +979,11 @@ static void emif_calculate_regs(const struct emif_device_details *devices,
 	emif_assert((cs1_device == NULL) ||
 		    (cs1_device->type == LPDDR2_TYPE_NVM) ||
 		    (cs0_device->type == cs1_device->type));
+#ifdef CONFIG_LIVE_OC
+	emif_assert(freq <= (MAX_LPDDR2_FREQ / 100) * liveoc_core_ocvalue());
+#else
 	emif_assert(freq <= MAX_LPDDR2_FREQ);
+#endif
 
 	set_ddr_clk_period(freq);
 

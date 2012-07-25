@@ -603,4 +603,10 @@ config FSYNC_CONTROL
         help
           Say Y here to enable FSync Control
 
+config LIVE_OC
+        bool "Support for Live OC"
+        default y
+        help
+          Say Y here to enable Live OC
+
 endif # MISC_DEVICES

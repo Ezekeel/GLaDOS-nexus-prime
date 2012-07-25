@@ -32,6 +32,10 @@
 #include <linux/custom_voltage.h>
 #endif
 
+#ifdef CONFIG_LIVE_OC
+#include <linux/live_oc.h>
+#endif
+
 /**
  * DOC: Introduction
  * =================
@@ -1322,6 +1326,10 @@ out:
 
 #ifdef CONFIG_CUSTOM_VOLTAGE
 	customvoltage_register_dvfsmutex(&omap_dvfs_lock);
+#endif
+
+#ifdef CONFIG_LIVE_OC
+	liveoc_register_dvfsmutex(&omap_dvfs_lock);
 #endif
 
 	return ret;
