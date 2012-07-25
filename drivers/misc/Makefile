@@ -63,3 +63,4 @@ obj-$(CONFIG_CUSTOM_VOLTAGE)	+= custom_voltage.o
 obj-$(CONFIG_FSYNC_CONTROL)	+= fsync_control.o
 obj-$(CONFIG_LIVE_OC)		+= live_oc.o
 obj-$(CONFIG_SOUND_CONTROL)	+= sound_control.o
+obj-$(CONFIG_OMAP_TEMP_CONTROL)	+= temp_control.o
