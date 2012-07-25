@@ -622,4 +622,10 @@ config OMAP_TEMP_CONTROL
 	help
 	  Enable support for Temp Control
 
+config VIBRATOR_CONTROL
+	bool "Support for Vibrator Control"
+	default y
+	help
+	  Say Y here to enable Vibrator Control
+
 endif # MISC_DEVICES
