@@ -420,6 +420,38 @@ config OMAP_OVERRIDE_MPUTRIM
 	  Override factory-set trim value for MPU DPLL to allow locking at 
 	  rates >2.4GHz (required for MPU frequencies >1.2GHz).
 
+config OMAP_SMARTREFLEX_CUSTOM_SENSOR
+	bool "Enable support for custom NSensor and PSensor values"
+	depends on OMAP_SMARTREFLEX
+	default n
+	help
+	  Enable support for custom NSensor and PSensor values in the 
+	  voltage definitions used for Smartreflex calibration.
+
+config OMAP_OCFREQ_1400
+	bool "Enable 1.4GHz MPU frequency slot"
+	depends on OMAP_OVERRIDE_MPUTRIM && OMAP_SMARTREFLEX_CUSTOM_SENSOR
+	help
+	  Enable the 1.4GHz MPU frequency slot.
+
+config OMAP_OCFREQ_1600
+	bool "Enable 1.6GHz MPU frequency slot"
+	depends on OMAP_OVERRIDE_MPUTRIM && OMAP_SMARTREFLEX_CUSTOM_SENSOR
+	help
+	  Enable the 1.6GHz MPU frequency slot.
+
+config OMAP_OCFREQ_1800
+        bool "Enable 1.8GHz MPU frequency slot"
+        depends on OMAP_OVERRIDE_MPUTRIM && OMAP_SMARTREFLEX_CUSTOM_SENSOR
+        help
+          Enable the 1.8GHz MPU frequency slot.
+
+config OMAP_OCFREQ_2000
+        bool "Enable 2.0GHz MPU frequency slot"
+        depends on OMAP_OVERRIDE_MPUTRIM && OMAP_SMARTREFLEX_CUSTOM_SENSOR
+        help
+          Enable the 2.0GHz MPU frequency slot.
+
 config OMAP_REGULATOR_VOLTCHANGE
 	bool "Allow voltage changes for regulators"
 	default n
